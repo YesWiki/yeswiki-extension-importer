@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF8"?>
+<plugin name="ywimporter" version="0.7" active="1">
+  <author>Florian Schmitt <mrflos@chmok.net></author>
+  <label>YesWiki Importer to bazar databases</label>
+  <desc>Pensé local, bazar global</desc>
+</plugin>
