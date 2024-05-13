@@ -2,13 +2,11 @@
 
 namespace YesWiki\Importer\Commands;
 
-use Exception;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
-use Throwable;
 use YesWiki\Core\Service\ConsoleService;
 use YesWiki\Wiki;
 use YesWiki\Importer\Service\ImporterManager;
@@ -38,12 +36,11 @@ class ImporterCommand extends Command
 
             // the full command description shown when running the command with
             // the "--help" option
-            ->setHelp('Synchronize selected data sources to this YesWiki.'."\n" .
+            ->setHelp('Synchronize selected data sources to this YesWiki.' . "\n" .
                 "If no source indicated it will sync them all\n")
 
             ->addOption('source', 's', InputOption::VALUE_OPTIONAL, 'The key name in the config file for source, leave empty for all sources')
-            ->addOption('wipe', 'w', InputOption::VALUE_NONE, 'Will delete entries and database model and rebuild from scratch')
-        ;
+            ->addOption('wipe', 'w', InputOption::VALUE_NONE, 'Will delete entries and database model and rebuild from scratch');
     }
     protected function checkConfig(OutputInterface $output)
     {

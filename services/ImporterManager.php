@@ -2,6 +2,8 @@
 
 namespace YesWiki\Importer\Service;
 
+use \Exception;
+use \Throwable;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
@@ -18,8 +20,6 @@ class ImporterManager
     protected $entryManager;
     protected $formManager;
     protected $wiki;
-    protected $config;
-
 
     public function __construct(
         ParameterBagInterface $params,
@@ -27,25 +27,12 @@ class ImporterManager
         EntryManager $entryManager,
         FormManager $formManager,
         Wiki $wiki
-    )
-    {
+    ) {
         $this->params = $params;
         $this->services = $services;
         $this->entryManager = $entryManager;
         $this->formManager = $formManager;
         $this->wiki = $wiki;
-        $config = $this->checkConfig($params->get('dataSources'));
-        $this->config = $config;
-    }
-
-    /**
-     * Check if config input is good enough to be used by Importer
-     * @param array $config
-     * @return array $config checked config
-     */
-    public function checkConfig(array $config)
-    {
-        return $config;
     }
 
     public function getAvailableImporters()
@@ -61,21 +48,36 @@ class ImporterManager
         return $importers;
     }
 
-    private function findClass(string $class)
+    private function findImporterClass(string $importer, string $source)
     {
-       if (class_exists($class)) {
-
-       }
+        $classPrefixes = ['YesWiki\Importer\Service\\', 'YesWiki\Custom\Service\\'];
+        foreach ($classPrefixes as $prefix) {
+            $className = $prefix . $importer . 'Importer';
+            if (class_exists($className)) {
+                return new $className(
+                    $source,
+                    $this->params,
+                    $this->services,
+                    $this->entryManager,
+                    $this->formManager,
+                    $this->wiki
+                );
+            }
+        }
+        return false;
     }
 
     public function syncSource($source, $sourceOptions)
     {
         try {
-            $importer = $this->findClass($sourceOptions['importer'].'Importer');    
+            $importer = $this->findImporterClass($sourceOptions['importer'], $source);
+            if (!$importer) {
+                return [Command::INVALID, 'Importer ' . $sourceOptions['importer'] . ' not found'];
+            }
             $data = $importer->getData();
-            $data = $importer->parseData($data);
+            $data = $importer->mapData($data);
             $importer->createFormModel();
-            $importer->syncData();
+            $importer->syncData($data);
         } catch (\Throwable $th) {
             return [Command::INVALID, $th->getMessage()];
         }

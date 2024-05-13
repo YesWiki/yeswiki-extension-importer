@@ -26,8 +26,7 @@ abstract class Importer
         EntryManager $entryManager,
         FormManager $formManager,
         Wiki $wiki
-    )
-    {
+    ) {
         $this->params = $params;
         $this->services = $services;
         $this->entryManager = $entryManager;
@@ -56,8 +55,8 @@ abstract class Importer
     {
         return;
     }
-    
-    public function parseData()
+
+    public function parseData(array $data)
     {
         return;
     }
@@ -67,7 +66,7 @@ abstract class Importer
         return;
     }
 
-    public function syncData()
+    public function syncData(array $data)
     {
         return;
     }

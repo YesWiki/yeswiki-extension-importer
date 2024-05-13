@@ -4,4 +4,8 @@ services:
     public: true
 
   YesWiki\Importer\Service\:
-    resource: 'services/*'
+    resource: "services/*"
+    autowire: false
+
+  YesWiki\Importer\Service\ImporterManager:
+    autowire: true
