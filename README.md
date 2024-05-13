@@ -11,10 +11,36 @@ Pouvoir injecter des données dans Bazar depuis une API externe, qui dans un pre
 - YesWiki to YesWiki
 
 ## Configuration
-
+add arrays of dataSources in wakka.config.php
+```php
+ 'dataSources' => [
+        'korben-rss' => [
+            'url' => 'https://korben.info/feed',
+            'formId' => '6',
+            'importer' => 'Rss',
+        ]
+    ],
+```
 ## Utilisation
 
+**Dans le répertoire racine du yeswiki**.
 
+Tout importer
+```bash
+./yeswiki importer:sync
+```
+
+Importer la source korben-rss
+```bash
+./yeswiki importer:sync -s korben-rss
+```
+
+Plus d'infos
+```bash
+./yeswiki importer:sync -h
+```
+
+## Cdc
 Une classe abstraite `Importer` et on implémente le code specifique a chaque usage
 les donnees sensibles (token, credentials) sont sauvées de le fichier de conf
 pour commencer on lancera la sync en ligne de commande (cli symfony), qui pourra etre appelée dans un CRON
