@@ -46,17 +46,17 @@ class YunohostAppImporter extends Importer
 
     public function authenticate()
     {
-        // curl 'https://aleks-test-install-bookworm.test/yunohost/portalapi/login' -X POST -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0' -H 'Accept: application/json' -H 'Accept-Language: fr,fr-FR;q=0.8,en-US;q=0.5,en;q=0.3' -H 'Accept-Encoding: gzip, deflate, br' -H 'Referer: https://aleks-test-install-bookworm.test/yunohost/sso/login' -H 'content-type: application/json' -H 'Origin: https://aleks-test-install-bookworm.test' -H 'Connection: keep-alive' -H 'Sec-Fetch-Dest: empty' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Site: same-origin' -H 'TE: trailers' --data-raw '{"credentials":"camille:Yunohost"}'
+        // curl 'https://aleks-test-install-bookworm.test/yunohost/portalapi/login' -X POST -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0' -H 'Accept: application/json' -H 'Accept-Language: fr,fr-FR;q=0.8,en-US;q=0.5,en;q=0.3' -H 'Accept-Encoding: gzip, deflate, br' -H 'Referer: https://aleks-test-install-bookworm.test/yunohost/sso/login' -H 'content-type: application/json' -H 'Origin: https://aleks-test-install-bookworm.test' -H 'Connection: keep-alive' -H 'Sec-Fetch-Dest: empty' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Site: same-origin' -H 'TE: trailers' --data-raw '{"credentials":"xxxxxxxx:xxxxxx"}'
         echo 'coucou auth';
         return $this->importerManager->curl(
-            $this->config['url'].'/yunohost/sso/login',
+            $this->config['url'] . '/yunohost/sso/login',
             [
                 'Accept: application/json',
                 'Accept-Encoding: gzip, deflate, br',
                 'content-type: application/json',
             ],
             true,
-            '{"credentials":"'.$this->config['auth']['user'].':'.$this->config['auth']['password'].'"}',
+            '{"credentials":"' . $this->config['auth']['user'] . ':' . $this->config['auth']['password'] . '"}',
             (empty($this->config['noSSLCheck']) ? false : $this->config['noSSLCheck'])
         );
     }
