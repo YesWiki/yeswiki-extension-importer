@@ -97,7 +97,7 @@ class RssImporter extends Importer
             $preparedData[$i]['bf_titre'] = $item['title'] . "\n";
             $preparedData[$i]['bf_auteurice'] = $item['author'] . "\n";
             $preparedData[$i]['bf_categories'] = implode(', ', $item['categories']) . "\n";
-            $preparedData[$i]['bf_content'] = $item['content'] . "\n";
+            $preparedData[$i]['bf_description'] = $item['content'] . "\n";
             $preparedData[$i]['bf_chapeau'] = $item['summary'] . "\n";
             $preparedData[$i]['bf_url'] = $item['link'] . "\n";
             $preparedData[$i]['date_creation_fiche'] = $item['date'] . "\n";
