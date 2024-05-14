@@ -75,7 +75,6 @@ class ImporterManager
             if (!$importer) {
                 return [Command::INVALID, 'Importer ' . $sourceOptions['importer'] . ' not found'];
             }
-            echo 'syncxSource';
             $data = $importer->getData();
             $data = $importer->mapData($data);
             $importer->createFormModel();
@@ -86,17 +85,19 @@ class ImporterManager
         return [Command::SUCCESS, _t('SOURCE_SUCCESSFULLY_SYNCED', $source)];
     }
 
-    public function curl($url, $headers = [], $isPost = false, $postData = null, $noSSLCheck = false, $timeoutInSec = 10)
+    public function curl($url, $headers = [], $isPost = false, $postData = null, $noSSLCheck = false, $showHeader = false, $timeoutInSec = 10)
     {
         $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_HEADER, 1);
+        if ($showHeader) {
+            curl_setopt($ch, CURLOPT_HEADER, 1);
+        }
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeoutInSec);
         curl_setopt($ch, CURLOPT_TIMEOUT, $timeoutInSec);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_POST, $isPost);
         //curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         if ($postData) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
         }
         if ($noSSLCheck) {
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
@@ -104,7 +105,10 @@ class ImporterManager
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($ch);
         curl_close($ch);
-        //dump(curl_error($ch));
+        $errors = curl_error($ch);
+        if (!empty($errors)) {
+            var_dump($errors);
+        }
         return $response;
     }
 }

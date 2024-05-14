@@ -46,24 +46,38 @@ class YunohostAppImporter extends Importer
 
     public function authenticate()
     {
-        // curl 'https://aleks-test-install-bookworm.test/yunohost/portalapi/login' -X POST -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0' -H 'Accept: application/json' -H 'Accept-Language: fr,fr-FR;q=0.8,en-US;q=0.5,en;q=0.3' -H 'Accept-Encoding: gzip, deflate, br' -H 'Referer: https://aleks-test-install-bookworm.test/yunohost/sso/login' -H 'content-type: application/json' -H 'Origin: https://aleks-test-install-bookworm.test' -H 'Connection: keep-alive' -H 'Sec-Fetch-Dest: empty' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Site: same-origin' -H 'TE: trailers' --data-raw '{"credentials":"xxxxxxxx:xxxxxx"}'
-        echo 'coucou auth';
-        return $this->importerManager->curl(
-            $this->config['url'] . '/yunohost/sso/login',
+
+        $response = $this->importerManager->curl(
+            $this->config['url'] . '/yunohost/portalapi/login',
             [
-                'Accept: application/json',
+                'X-Requested-With: YunohostImporter',
                 'Accept-Encoding: gzip, deflate, br',
-                'content-type: application/json',
             ],
             true,
-            '{"credentials":"' . $this->config['auth']['user'] . ':' . $this->config['auth']['password'] . '"}',
-            (empty($this->config['noSSLCheck']) ? false : $this->config['noSSLCheck'])
+            ['credentials' => $this->config['auth']['user'] . ':' . $this->config['auth']['password']],
+            (empty($this->config['noSSLCheck']) ? false : $this->config['noSSLCheck']),
+            true
         );
+        preg_match_all('/^Set-Cookie:\s*([^;]*)/mi', $response, $matches);
+        return $matches[1][0] ?? null;
     }
 
     public function getData()
     {
-        var_dump($this->authenticate());
+        $cookie = $this->authenticate();
+        $response = $this->importerManager->curl(
+            $this->config['url'] . '/yunohost/portalapi/me',
+            [
+                'X-Requested-With: YunohostImporter',
+                'Accept-Encoding: gzip, deflate, br',
+                'Cookie: ' . $cookie
+            ],
+            false,
+            [],
+            (empty($this->config['noSSLCheck']) ? false : $this->config['noSSLCheck'])
+        );
+        $data = json_decode($response, true)['apps'] ?? null;
+
         return $data ?? null;
     }
 
@@ -72,14 +86,12 @@ class YunohostAppImporter extends Importer
         $preparedData = [];
         if (is_array($data)) {
             foreach ($data as $i => $item) {
-                $preparedData[$i]['bf_titre'] = $item['title'] . "\n";
-                $preparedData[$i]['bf_auteurice'] = $item['author'] . "\n";
-                $preparedData[$i]['bf_categories'] = implode(', ', $item['categories']) . "\n";
-                $preparedData[$i]['bf_description'] = $item['content'] . "\n";
-                $preparedData[$i]['bf_chapeau'] = $item['summary'] . "\n";
-                $preparedData[$i]['bf_url'] = $item['link'] . "\n";
-                $preparedData[$i]['date_creation_fiche'] = $item['date'] . "\n";
-                $preparedData[$i]['imagebf_image'] = $item['image'] . "\n-----\n";
+                $preparedData[$i]['bf_titre'] = $item['label'];
+                $preparedData[$i]['yunohost_app_id'] = $i;
+                $preparedData[$i]['bf_description'] = $item['description'][$this->config['lang']];
+                $preparedData[$i]['public'] = $item['public'];
+                $preparedData[$i]['imagebf_image'] = 'https:' . $item['logo'];
+                $preparedData[$i]['bf_url'] = 'https://' . $item['url'];
             }
         }
         return $preparedData;
