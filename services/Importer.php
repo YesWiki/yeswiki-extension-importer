@@ -6,6 +6,7 @@ use Psr\Container\ContainerInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use YesWiki\Core\Service\AclService;
 use YesWiki\Core\Service\TemplateEngine;
+use YesWiki\Importer\Service\ImporterManager;
 use YesWiki\Bazar\Service\EntryManager;
 use YesWiki\Bazar\Service\FormManager;
 use YesWiki\Wiki;
@@ -15,6 +16,7 @@ abstract class Importer
     protected $params;
     protected $services;
     protected $entryManager;
+    protected $importerManager;
     protected $formManager;
     protected $wiki;
     protected $config;
@@ -24,12 +26,14 @@ abstract class Importer
         ParameterBagInterface $params,
         ContainerInterface $services,
         EntryManager $entryManager,
+        ImporterManager $importerManager,
         FormManager $formManager,
         Wiki $wiki
     ) {
         $this->params = $params;
         $this->services = $services;
         $this->entryManager = $entryManager;
+        $this->importerManager = $importerManager;
         $this->formManager = $formManager;
         $this->wiki = $wiki;
         $config = $this->checkConfig($params->get('dataSources'));

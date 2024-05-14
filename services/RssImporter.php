@@ -8,7 +8,6 @@ use YesWiki\Bazar\Service\EntryManager;
 use YesWiki\Bazar\Service\FormManager;
 use YesWiki\Wiki;
 
-
 class RssImporter extends Importer
 {
     protected $source;
