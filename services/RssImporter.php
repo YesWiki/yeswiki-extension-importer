@@ -93,8 +93,11 @@ EOT,
                 );
                 $img = $matches[1][0] ?? '';
                 $cats = [];
-                foreach ($item->get_categories() as $category) {
-                    $cats[] = $category->get_label();
+                $categories = $item->get_categories();
+                if (!empty($categories)) {
+                    foreach ($categories as $category) {
+                        $cats[] = $category->get_label();
+                    }
                 }
                 if ($author = $item->get_author()) {
                     $author = $author->get_name();
