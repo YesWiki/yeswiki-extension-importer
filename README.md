@@ -4,11 +4,14 @@ Pouvoir injecter des données dans Bazar depuis une API externe, qui dans un pre
 
 ## Use cases
 
-- yunohost listes d'apps publiques/privées `YunohostAppImporter` c
-- Odoo events `OdooEventsImporter` 
+- yunohost listes d'apps publiques/privées `YunohostAppImporter`
 - Flux RSS `RssImporter` 
-- Données géographiques de l'état
+- json custom Odoo events `OdooEventsImporter` 
+- caldav/cardcard
+- peertube en embed
+- mastodon activityPub
 - YesWiki to YesWiki
+- Données géographiques de l'état
 
 ## Configuration
 add arrays of dataSources in wakka.config.php

@@ -11,6 +11,7 @@ use YesWiki\Core\Service\AclService;
 use YesWiki\Core\Service\TemplateEngine;
 use YesWiki\Bazar\Service\EntryManager;
 use YesWiki\Bazar\Service\FormManager;
+use YesWiki\Bazar\Service\ListManager;
 use YesWiki\Wiki;
 
 class ImporterManager
@@ -19,6 +20,7 @@ class ImporterManager
     protected $services;
     protected $entryManager;
     protected $formManager;
+    protected $listManager;
     protected $wiki;
 
     public function __construct(
@@ -26,12 +28,14 @@ class ImporterManager
         ContainerInterface $services,
         EntryManager $entryManager,
         FormManager $formManager,
+        ListManager $listManager,
         Wiki $wiki
     ) {
         $this->params = $params;
         $this->services = $services;
         $this->entryManager = $entryManager;
         $this->formManager = $formManager;
+        $this->listManager = $listManager;
         $this->wiki = $wiki;
     }
 
@@ -61,6 +65,7 @@ class ImporterManager
                     $this->entryManager,
                     $this,
                     $this->formManager,
+                    $this->listManager,
                     $this->wiki
                 );
             }
@@ -77,7 +82,7 @@ class ImporterManager
             }
             $data = $importer->getData();
             $data = $importer->mapData($data);
-            $importer->createFormModel();
+            $importer->syncFormModel();
             $importer->syncData($data);
         } catch (\Throwable $th) {
             return [Command::INVALID, $th->getMessage()];
@@ -110,5 +115,30 @@ class ImporterManager
             var_dump($errors);
         }
         return $response;
+    }
+
+    public function downloadFile($sourceUrl, $noSSLCheck = false, $timeoutInSec = 10)
+    {
+        $t = explode('/', $sourceUrl);
+        $fileName = array_pop($t);
+        $destFile = sha1($sourceUrl).'_'.$fileName;
+        $destPath = 'files/' . $destFile;
+        $fp = fopen($destPath, 'wb');
+        $ch = curl_init($sourceUrl);
+        curl_setopt($ch, CURLOPT_FILE, $fp);
+        curl_setopt($ch, CURLOPT_HEADER, 0);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeoutInSec);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $timeoutInSec);
+        if ($noSSLCheck) {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        }
+        curl_exec($ch);
+        $errors = curl_error($ch);
+        if (!empty($errors)) {
+            var_dump($errors);
+        }
+        curl_close($ch);
+        fclose($fp);
+        return $destFile;
     }
 }

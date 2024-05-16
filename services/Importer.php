@@ -9,6 +9,7 @@ use YesWiki\Core\Service\TemplateEngine;
 use YesWiki\Importer\Service\ImporterManager;
 use YesWiki\Bazar\Service\EntryManager;
 use YesWiki\Bazar\Service\FormManager;
+use YesWiki\Bazar\Service\ListManager;
 use YesWiki\Wiki;
 
 abstract class Importer
@@ -18,6 +19,7 @@ abstract class Importer
     protected $entryManager;
     protected $importerManager;
     protected $formManager;
+    protected $listManager;
     protected $wiki;
     protected $config;
 
@@ -28,6 +30,7 @@ abstract class Importer
         EntryManager $entryManager,
         ImporterManager $importerManager,
         FormManager $formManager,
+        ListManager $listManager,
         Wiki $wiki
     ) {
         $this->params = $params;
@@ -35,6 +38,7 @@ abstract class Importer
         $this->entryManager = $entryManager;
         $this->importerManager = $importerManager;
         $this->formManager = $formManager;
+        $this->listManager = $listManager;
         $this->wiki = $wiki;
         $config = $this->checkConfig($params->get('dataSources'));
         $this->config = $config;
@@ -65,7 +69,7 @@ abstract class Importer
         return;
     }
 
-    public function createFormModel()
+    public function syncFormModel()
     {
         return;
     }
