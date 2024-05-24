@@ -41,12 +41,15 @@ class ImporterManager
 
     public function getAvailableImporters()
     {
+
         $services = array_filter($this->wiki->services->getServiceIds(), function ($subject) {
             return preg_match('/Importer$/', $subject);
         });
+
         $importers = [];
         foreach ($services as $serv) {
-            $shortClass = str_replace(['YesWiki\Importer\Service\\', 'YesWiki\Custom\Service\\', 'Importer'], '', $serv);
+            $short = explode('Service\\', $serv)[1];
+            $shortClass = str_replace(['Importer'], '', $short);
             $importers[$shortClass] = $serv;
         }
         return $importers;
@@ -54,22 +57,23 @@ class ImporterManager
 
     private function findImporterClass(string $importer, string $source)
     {
-        $classPrefixes = ['YesWiki\Importer\Service\\', 'YesWiki\Custom\Service\\'];
-        foreach ($classPrefixes as $prefix) {
-            $className = $prefix . $importer . 'Importer';
-            if (class_exists($className)) {
-                return new $className(
-                    $source,
-                    $this->params,
-                    $this->services,
-                    $this->entryManager,
-                    $this,
-                    $this->formManager,
-                    $this->listManager,
-                    $this->wiki
-                );
-            }
+        $available = $this->getAvailableImporters();
+        if (!empty($available[$importer])) {
+            $className = $available[$importer];
         }
+        if (!empty($className) && class_exists($className, false)) {
+            return new $className(
+                $source,
+                $this->params,
+                $this->services,
+                $this->entryManager,
+                $this,
+                $this->formManager,
+                $this->listManager,
+                $this->wiki
+            );
+        }
+
         return false;
     }
 
