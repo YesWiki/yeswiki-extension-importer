@@ -1,5 +1,8 @@
 {
     "require": {
         "league/html-to-markdown": "^5.1"
+    },
+    "config": {
+        "autoloader-suffix": "importer"
     }
 }
