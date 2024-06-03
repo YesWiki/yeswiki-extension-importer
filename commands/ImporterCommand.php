@@ -81,7 +81,8 @@ class ImporterCommand extends Command
                     continue;
                 }
                 $output->writeln("Importing source \"{$source}\"");
-                $out[$source] = $this->importer->syncSource($source, $sourceOptions);
+                //$out[$source] = $this->importer->syncSource($source, $sourceOptions);
+                $output->writeln($this->importer->syncSource($source, $sourceOptions));
             }
             return Command::SUCCESS;
         } else {

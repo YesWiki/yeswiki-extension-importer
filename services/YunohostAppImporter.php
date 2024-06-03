@@ -60,13 +60,13 @@ EOT,
         ];
 
         $this->databaseLists = [
-          'ListeVisibilite' =>  [
-            "titre_liste" => "Visibilité",
-            "label" => [
-              "pub" => "Publique",
-              "priv" => "Privée"
+            'ListeVisibilite' =>  [
+                "titre_liste" => "Visibilité",
+                "label" => [
+                    "pub" => "Publique",
+                    "priv" => "Privée"
+                ]
             ]
-          ]
         ];
     }
 
@@ -83,7 +83,6 @@ EOT,
 
     public function authenticate()
     {
-
         $response = $this->importerManager->curl(
             $this->config['url'] . '/yunohost/portalapi/login',
             [
@@ -142,7 +141,7 @@ EOT,
                 $entry['antispam'] = 1;
                 $this->entryManager->create($this->config['formId'], $entry);
             } else {
-                echo 'L\'application "'.$entry['bf_titre'].'" existe déja.'."\n";
+                echo 'L\'application "' . $entry['bf_titre'] . '" existe déja.' . "\n";
             }
         }
         return;
@@ -157,7 +156,7 @@ EOT,
                 // TODO : comment etre sur de l'id ?
                 $this->listManager->create($list['titre_liste'], $list['label']);
             } else {
-                echo 'La liste "'.$list['titre_liste'].'" existe deja.'."\n";
+                echo 'La liste "' . $list['titre_liste'] . '" existe deja.' . "\n";
                 // test if compatible
             }
         }
@@ -167,7 +166,7 @@ EOT,
             $this->databaseForms[0]['bn_id_nature'] = $this->config['formId'];
             $this->formManager->create($this->databaseForms[0]);
         } else {
-            echo 'La base bazar existe deja.'."\n";
+            echo 'La base bazar existe deja.' . "\n";
             // test if compatible
         }
         return;

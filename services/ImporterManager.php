@@ -2,13 +2,9 @@
 
 namespace YesWiki\Importer\Service;
 
-use Exception;
-use Throwable;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
-use YesWiki\Core\Service\AclService;
-use YesWiki\Core\Service\TemplateEngine;
 use YesWiki\Bazar\Service\EntryManager;
 use YesWiki\Bazar\Service\FormManager;
 use YesWiki\Bazar\Service\ListManager;
@@ -82,16 +78,19 @@ class ImporterManager
         try {
             $importer = $this->findImporterClass($sourceOptions['importer'], $source);
             if (!$importer) {
-                return [Command::INVALID, 'Importer ' . $sourceOptions['importer'] . ' not found'];
+                //return [Command::INVALID, 'Importer ' . $sourceOptions['importer'] . ' not found'];
+                return 'Importer ' . $sourceOptions['importer'] . ' not found';
             }
             $data = $importer->getData();
             $data = $importer->mapData($data);
             $importer->syncFormModel();
             $importer->syncData($data);
         } catch (\Throwable $th) {
-            return [Command::INVALID, $th->getMessage()];
+            //return [Command::INVALID, $th->getMessage()];
+            return $th->getMessage();
         }
-        return [Command::SUCCESS, _t('SOURCE_SUCCESSFULLY_SYNCED', $source)];
+        //return [Command::SUCCESS, _t('SOURCE_SUCCESSFULLY_SYNCED', $source)];
+        return _t('SOURCE_SUCCESSFULLY_SYNCED', ['source' => $source]);
     }
 
     public function curl($url, $headers = [], $isPost = false, $postData = null, $noSSLCheck = false, $showHeader = false, $timeoutInSec = 10)
@@ -125,7 +124,7 @@ class ImporterManager
     {
         $t = explode('/', $sourceUrl);
         $fileName = array_pop($t);
-        $destFile = sha1($sourceUrl).'_'.$fileName;
+        $destFile = sha1($sourceUrl) . '_' . $fileName;
         $destPath = 'files/' . $destFile;
         $fp = fopen($destPath, 'wb');
         $ch = curl_init($sourceUrl);
