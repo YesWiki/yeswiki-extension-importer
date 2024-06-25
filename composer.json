@@ -1,6 +1,7 @@
 {
     "require": {
-        "league/html-to-markdown": "^5.1"
+        "league/html-to-markdown": "^5.1",
+        "php-imap/php-imap": "^5.0"
     },
     "config": {
         "autoloader-suffix": "importer"

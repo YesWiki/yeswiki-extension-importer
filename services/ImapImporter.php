@@ -149,7 +149,7 @@ EOT,
             $res = multiArraySearch($existingEntries, 'message_id', $entry['message_id']);
             if (!$res) {
                 $entry['antispam'] = 1;
-                $this->entryManager->create($this->config['formId'], $entry, false, $entry['formId']);
+                $this->entryManager->create($this->config['formId'], $entry, false);
                 echo 'L\'email "' . $entry['bf_titre'] . '" a été créé.' . "\n";
             } else {
                 echo 'L\'email "' . $entry['bf_titre'] . '" existe déja.' . "\n";
