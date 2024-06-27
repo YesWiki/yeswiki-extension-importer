@@ -46,7 +46,7 @@ class ImporterCommand extends Command
     {
         if (empty($this->wiki->config['dataSources'])) {
             $output->writeln("No data sources found in config, does dataSources contain something?");
-            return false;
+            $this->wiki->config['dataSources'] = [];
         }
         $importers = $this->importer->getAvailableImporters();
         foreach ($this->wiki->config['dataSources'] as $id => $source) {
