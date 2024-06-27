@@ -71,7 +71,6 @@ class ImporterCommand extends Command
 
         $source = $input->getOption('source');
         $hasWipe = $input->getOption('wipe');
-        $out = [];
         if (!$source) {
             $output->writeln("Importing all sources");
             foreach ($this->wiki->config['dataSources'] as $source => $sourceOptions) {
@@ -81,19 +80,18 @@ class ImporterCommand extends Command
                     continue;
                 }
                 $output->writeln("Importing source \"{$source}\"");
-                //$out[$source] = $this->importer->syncSource($source, $sourceOptions);
                 $output->writeln($this->importer->syncSource($source, $sourceOptions));
             }
             return Command::SUCCESS;
         } else {
             if (empty($this->wiki->config['dataSources'][$source])) {
                 $output->writeln("No data source with key \"{$source}\" found in config, does dataSources[\"{$source}\"] contain something?");
-                return Command::INVALID;
+                return Command::SUCCESS;
             }
             $output->writeln("Importing source \"{$source}\"");
             $res = $this->importer->syncSource($source, $this->wiki->config['dataSources'][$source]);
-            $output->writeln($res[1]);
-            return $res[0];
+            $output->writeln($res);
+            return Command::SUCCESS;
         }
     }
 }
