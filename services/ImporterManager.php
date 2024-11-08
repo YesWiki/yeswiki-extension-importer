@@ -120,28 +120,31 @@ class ImporterManager
         return $response;
     }
 
-    public function downloadFile($sourceUrl, $noSSLCheck = false, $timeoutInSec = 10)
+    public function downloadFile($sourceUrl, $noSSLCheck = false, $timeoutInSec = 10, $replaceExisting = false)
     {
         $t = explode('/', $sourceUrl);
         $fileName = array_pop($t);
         $destFile = sha1($sourceUrl) . '_' . $fileName;
         $destPath = 'files/' . $destFile;
-        $fp = fopen($destPath, 'wb');
-        $ch = curl_init($sourceUrl);
-        curl_setopt($ch, CURLOPT_FILE, $fp);
-        curl_setopt($ch, CURLOPT_HEADER, 0);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeoutInSec);
-        curl_setopt($ch, CURLOPT_TIMEOUT, $timeoutInSec);
-        if ($noSSLCheck) {
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        if (!file_exists($destPath) || (file_exists($destPath) && $replaceExisting)) {
+            $fp = fopen($destPath, 'wb');
+            $ch = curl_init($sourceUrl);
+            curl_setopt($ch, CURLOPT_FILE, $fp);
+            curl_setopt($ch, CURLOPT_HEADER, 0);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeoutInSec);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $timeoutInSec);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            if ($noSSLCheck) {
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            }
+            curl_exec($ch);
+            $errors = curl_error($ch);
+            if (!empty($errors)) {
+                var_dump($errors);
+            }
+            curl_close($ch);
+            fclose($fp);
         }
-        curl_exec($ch);
-        $errors = curl_error($ch);
-        if (!empty($errors)) {
-            var_dump($errors);
-        }
-        curl_close($ch);
-        fclose($fp);
         return $destFile;
     }
 }
