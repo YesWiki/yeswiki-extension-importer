@@ -144,7 +144,7 @@ EOT,
 
     public function syncData($data)
     {
-        $existingEntries = $this->entryManager->search(['formIds' => [$this->config['formId']]]);
+        $existingEntries = $this->entryManager->search(['formsIds' => [$this->config['formId']]]);
         foreach ($data as $entry) {
             $res = multiArraySearch($existingEntries, 'message_id', $entry['message_id']);
             if (!$res) {

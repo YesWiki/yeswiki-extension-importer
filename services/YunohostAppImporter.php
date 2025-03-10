@@ -134,7 +134,7 @@ EOT,
 
     public function syncData($data)
     {
-        $existingEntries = $this->entryManager->search(['formIds' => [$this->config['formId']]]);
+        $existingEntries = $this->entryManager->search(['formsIds' => [$this->config['formId']]]);
         foreach ($data as $entry) {
             $res = multiArraySearch($existingEntries, 'yunohost_app_id', $entry['yunohost_app_id']);
             if (!$res) {
