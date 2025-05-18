@@ -30,18 +30,21 @@ add arrays of dataSources in wakka.config.php
 
 Tout importer
 ```bash
-./yeswiki importer:sync
+./yeswicli importer:sync
 ```
 
 Importer la source korben-rss
 ```bash
-./yeswiki importer:sync -s korben-rss
+./yeswicli importer:sync -s korben-rss
 ```
 
 Plus d'infos
 ```bash
-./yeswiki importer:sync -h
+./yeswicli importer:sync -h
 ```
+## Idées
+- importer YesWiki, qui permettrait de filtrer avec query, ou mot clé, un autre formulaire bazar d'un autre wiki
+- importer Ical minimaliste
 
 ## Cdc
 Une classe abstraite `Importer` et on implémente le code specifique a chaque usage

@@ -1,0 +1,46 @@
+<h1>{{ _t('Admin des importers') }}</h1>
+<form method="POST" action="{{currentUrl}}">
+  <div class="form-group">
+    <div class="bazar-radio-rows bazar-radio radio_required">
+    {% for name,class in importers %}
+    <div class="radio">
+      <label>
+        <input type="radio" name="importer" id="importer_{{name}}" value="{{name}}" class="importer-radio">
+        <span>{{ _t('IMPORTER_' ~ name|upper) }}</span>
+      </label>
+    </div>
+    {% endfor %}
+    </div>
+  </div>
+  
+  <div id="form_Imap" class="importer-form hide">IMAP</div>
+  
+  <div id="form_Rss" class="importer-form hide">
+    <div class="form-group">
+      <label for="urlRss" class="control-label">{{ _t('IMPORTER_RSS_URL') }}</label>
+      <div class="">
+        <input required type="url" class="form-control" name="urlRss" id="urlRss" placeholder="{{ _t('IMPORTER_RSS_URL')}}">
+      </div>
+    </div>
+  </div>
+
+  <div id="form_YunohostApp" class="importer-form hide">Yunohost App</div>
+  
+  <div class="form-group">
+    <label for="formId" class="control-label">{{ _t('IMPORTER_BAZAR_ID') }}</label>
+    <div class="">
+      <input required type="number" min="1" class="form-control" id="formId" name="formId" placeholder="{{ _t('IMPORTER_BAZAR_ID')}}">
+    </div>
+  </div>
+
+  <button class="btn btn-primary" type="submit">{{ _t('BAZ_SAVE')}}</button>
+</form>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  $('.importer-radio').on('click', function() {
+    $('.importer-form').addClass('hide')
+    const el = '#form_'+$(this).val()
+    $(el).removeClass('hide')
+  })
+})
+</script>
