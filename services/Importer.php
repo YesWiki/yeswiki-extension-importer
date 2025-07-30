@@ -4,8 +4,6 @@ namespace YesWiki\Importer\Service;
 
 use Psr\Container\ContainerInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
-use YesWiki\Core\Service\AclService;
-use YesWiki\Core\Service\TemplateEngine;
 use YesWiki\Importer\Service\ImporterManager;
 use YesWiki\Bazar\Service\EntryManager;
 use YesWiki\Bazar\Service\FormManager;
