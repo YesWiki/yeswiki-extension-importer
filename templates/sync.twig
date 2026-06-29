@@ -2,8 +2,4 @@
     <input type="hidden" name="sync" value="1">
     <button class="btn btn-primary" type="submit">{{ _t("IMPORTER_SYNC_RUN") }}</button>
 </form>
-{% if output is not null %}
-    <div class="alert alert-{{ returnCode == 0 ? 'success' : 'danger' }}">
-        <pre>{{ output }}</pre>
-    </div>
-{% endif %}
+{% if output is not null %}<pre>{{ output }}</pre>{% endif %}
