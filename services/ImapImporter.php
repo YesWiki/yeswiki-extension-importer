@@ -146,11 +146,10 @@ EOT,
     {
         $existingEntries = $this->entryManager->search(['formsIds' => [$this->config['formId']]]);
         foreach ($data as $entry) {
-            dump($entry['message_id']);
             $res = multiArraySearch($existingEntries, 'message_id', $entry['message_id']);
             if (!$res) {
                 $entry['antispam'] = 1;
-                $this->entryManager->create($this->config['formId'], $entry, false);
+                $this->entryManager->create($this->config['formId'], $entry, false, $entry['message_id']);
                 echo 'L\'email "' . $entry['bf_titre'] . '" a été créé.' . "\n";
             } else {
                 echo 'L\'email "' . $entry['bf_titre'] . '" existe déja.' . "\n";
