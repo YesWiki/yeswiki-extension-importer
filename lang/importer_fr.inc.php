@@ -7,5 +7,6 @@ return [
     'IMPORTER_RSS_URL' => 'Url du flux RSS',
     'IMPORTER_BAZAR_ID' => 'Identifiant de formulaire Bazar lié',
     'SOURCE_SUCCESSFULLY_SYNCED'  => 'Source "%{source}" synchronisée avec succès.',
+    'IMPORTER_SYNC_RUN' => 'Lancer la synchronisation',
 
 ];
