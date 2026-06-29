@@ -136,7 +136,7 @@ EOT,
             $preparedData[$i]['bf_auteurice'] = (string) ($email->fromName ?? $email->fromAddress);
             $preparedData[$i]['bf_auteurice_email'] = (string) $email->fromAddress;
             $preparedData[$i]['bf_description'] = $converter->convert($message);
-            $preparedData[$i]['message_id'] = $i;
+            $preparedData[$i]['message_id'] = trim($i, '<>');
             $preparedData[$i]['date_creation_fiche'] = $preparedData[$i]['bf_date'] = date_format(date_create($email->date), 'Y-m-d H:i:s');
         }
         return $preparedData;
