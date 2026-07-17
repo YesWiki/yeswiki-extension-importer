@@ -59,7 +59,7 @@
     <div class="form-group">
       <label for="urlRss" class="control-label">{{ _t('IMPORTER_RSS_URL') }}</label>
       <div class="">
-        <input required type="url" class="form-control" name="urlRss" id="urlRss" placeholder="{{ _t('IMPORTER_RSS_URL')}}">
+        <input type="url" class="form-control conditional-required" name="urlRss" id="urlRss" placeholder="{{ _t('IMPORTER_RSS_URL')}}">
       </div>
     </div>
   </div>
@@ -70,13 +70,13 @@
     <div class="form-group">
       <label for="urlYesWikiList" class="control-label">{{ _t('IMPORTER_YESWIKILIST_URL') }}</label>
       <div class="">
-        <input required type="url" class="form-control" name="urlYesWikiList" id="urlYesWikiList" placeholder="{{ _t('IMPORTER_YESWIKILIST_URL')}}">
+        <input type="url" class="form-control conditional-required" name="urlYesWikiList" id="urlYesWikiList" placeholder="{{ _t('IMPORTER_YESWIKILIST_URL')}}">
       </div>
     </div>
     <div class="form-group">
       <label for="listIdYesWikiList" class="control-label">{{ _t('IMPORTER_YESWIKILIST_LISTID') }}</label>
       <div class="">
-        <input required type="text" class="form-control" name="listIdYesWikiList" id="listIdYesWikiList" placeholder="{{ _t('IMPORTER_YESWIKILIST_LISTID')}}">
+        <input type="text" class="form-control conditional-required" name="listIdYesWikiList" id="listIdYesWikiList" placeholder="{{ _t('IMPORTER_YESWIKILIST_LISTID')}}">
       </div>
     </div>
   </div>
@@ -95,9 +95,10 @@ document.addEventListener("DOMContentLoaded", function() {
   // importers that do not create Bazar entries, so no formId is needed
   const importersWithoutForm = ['YesWikiList']
   $('.importer-radio').on('click', function() {
-    $('.importer-form').addClass('hide')
+    // a hidden field cannot be a required field (browser can't focus it to show the validation error)
+    $('.importer-form').addClass('hide').find('.conditional-required').prop('required', false)
     const el = '#form_'+$(this).val()
-    $(el).removeClass('hide')
+    $(el).removeClass('hide').find('.conditional-required').prop('required', true)
     const needsForm = !importersWithoutForm.includes($(this).val())
     $('#form_group_formId').toggleClass('hide', !needsForm)
     $('#formId').prop('required', needsForm)
