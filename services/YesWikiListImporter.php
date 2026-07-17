@@ -79,6 +79,12 @@ class YesWikiListImporter extends Importer
                 'label' => $item['bf_titre'],
             ];
         }
+        usort($nodes, function ($a, $b) {
+            return strcmp(
+                strtolower(iconv('UTF-8', 'ASCII//TRANSLIT', $a['label'])),
+                strtolower(iconv('UTF-8', 'ASCII//TRANSLIT', $b['label']))
+            );
+        });
         return $nodes;
     }
 
