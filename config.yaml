@@ -1,3 +1,8 @@
+parameters:
+  sync_secret: ""
+  importer_editable_config_params:
+    - "sync_secret"
+
 services:
   _defaults:
     autowire: true
@@ -9,3 +14,7 @@ services:
 
   YesWiki\Importer\Service\ImporterManager:
     autowire: true
+
+  # Allows to use controllers as services
+  YesWiki\Importer\Controller\:
+    resource: "controllers/*"

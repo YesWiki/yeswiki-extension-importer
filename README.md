@@ -83,6 +83,32 @@ Plus d'infos
 ./yeswicli importer:sync -h
 ```
 
+### Depuis un webhook/cron externe
+
+Une route `GET /api/sync` permet de déclencher la synchronisation de toutes
+les sources (équivalent à `./yeswicli importer:sync`), protégée par un secret
+partagé plutôt que par les ACLs du wiki (utile pour un cron externe ou un
+webhook).
+
+Ajouter dans `wakka.config.php` :
+
+```php
+'sync_secret' => 'un-secret-a-generer',
+```
+
+`sync_secret` peut aussi être renseigné depuis la page d'édition de la
+configuration du wiki (`EditConfigAction`), sans toucher au fichier.
+
+Puis appeler :
+
+```bash
+curl -H "secret: un-secret-a-generer" "https://mon-yeswiki.fr/?api/sync"
+```
+
+La réponse JSON contient, pour chaque source configurée, le même message que
+`./yeswicli importer:sync` (succès avec durée, ou erreur). Sans secret configuré
+ou avec un secret invalide, la route répond `401`.
+
 ## Idées
 
 - importer Ical minimaliste

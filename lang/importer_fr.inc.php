@@ -19,5 +19,6 @@ return [
     'IMPORTER_SOURCE_SAVED' => 'La source a été enregistrée dans la configuration.',
     'IMPORTER_SOURCE_DELETED' => 'La source a été supprimée de la configuration.',
     'IMPORTER_CONFIRM_DELETE' => 'Voulez-vous vraiment supprimer cette source ?',
+    'EDIT_CONFIG_HINT_SYNC_SECRET' => 'Secret à fournir dans le header "secret" pour déclencher la synchronisation via la route /api/sync (webhook/cron externe)',
 
 ];
