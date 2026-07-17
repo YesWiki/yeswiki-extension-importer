@@ -21,7 +21,7 @@ class AdminImportersAction extends YesWikiAction
                 // generate a unique key if not exists
                 $_POST['id'] = $this->generateId();
             }
-            $keys = ['url'];
+            $keys = ['url', 'listId'];
             foreach ($keys as $key) {
                 if (!empty($_POST[$key.$_POST['importer']])) {
                     $_POST[$key] = $_POST[$key.$_POST['importer']];

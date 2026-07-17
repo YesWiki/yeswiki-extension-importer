@@ -11,7 +11,7 @@ premier temps sera la source de vérité.
 - caldav/cardcard
 - peertube en embed
 - mastodon activityPub
-- YesWiki to YesWiki
+- YesWiki to YesWiki (liste de fiches `id_fiche`/`bf_titre`) `YesWikiListImporter`
 - Données géographiques de l'état
 
 ## Configuration
@@ -27,6 +27,31 @@ add arrays of dataSources in wakka.config.php
         ]
     ],
 ```
+
+### `YesWikiList`
+
+Récupère des fiches depuis l'API d'un autre YesWiki (Bazar) et construit/met à
+jour une liste locale (`ListManager`) à partir des couples `id_fiche`/`bf_titre`
+retournés. Seuls ces deux champs sont utilisés, même si l'url en renvoie
+d'autres (utile par exemple pour filtrer via `query`). Aucune fiche ni
+formulaire Bazar n'est créé : le résultat est uniquement une liste
+(utilisable ensuite comme options d'un champ `checkbox`/`select`/`radio`
+d'un formulaire Bazar).
+
+```php
+ 'dataSources' => [
+        'hpf-accompagnement' => [
+            'importer' => 'YesWikiList',
+            'url' => 'https://www.habitatparticipatif-france.fr/?api/forms/16/entries&fields=id_fiche,bf_titre,url,checkboxListeActivitesProposees&query=checkboxListeActivitesProposees=accompagnement',
+            'listId' => 'ListeAccompagnateurutricesHPF',
+            // 'title' => 'Accompagnateur·ices HPF', // optionnel, par défaut = listId
+        ]
+    ],
+```
+
+À chaque synchronisation, la liste locale `listId` est entièrement remplacée
+par le contenu à jour de l'url distante (les clés/labels disparus côté source
+disparaissent aussi localement).
 
 ## Utilisation
 
@@ -52,8 +77,6 @@ Plus d'infos
 
 ## Idées
 
-- importer YesWiki, qui permettrait de filtrer avec query, ou mot clé, un autre
-  formulaire bazar d'un autre wiki
 - importer Ical minimaliste
 
 ## Cdc
