@@ -11,6 +11,7 @@ return [
     'IMPORTER_BAZAR_ID' => 'Identifiant de formulaire Bazar lié',
     'SOURCE_SUCCESSFULLY_SYNCED'  => 'Source "%{source}" synchronisée avec succès.',
     'IMPORTER_SYNC_RUN' => 'Lancer la synchronisation',
+    'IMPORTER_ELAPSED_TIME' => '(en %{duration})',
     'IMPORTER_ADD_SOURCE' => 'Ajouter une source',
     'IMPORTER_SOURCE_ID' => 'Identifiant de la source',
     'IMPORTER_SOURCE_TYPE' => 'Type',

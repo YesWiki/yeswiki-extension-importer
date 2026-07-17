@@ -74,6 +74,7 @@ class ImporterManager
 
     public function syncSource($source, $sourceOptions)
     {
+        $startTime = microtime(true);
         try {
             $importer = $this->findImporterClass($sourceOptions['importer'], $source);
             if (!$importer) {
@@ -86,10 +87,16 @@ class ImporterManager
             $importer->syncData($data);
         } catch (\Throwable $th) {
             //return [Command::INVALID, $th->getMessage()];
-            return $th->getMessage();
+            return $th->getMessage() . ' ' . _t('IMPORTER_ELAPSED_TIME', ['duration' => $this->formatDuration($startTime)]);
         }
         //return [Command::SUCCESS, _t('SOURCE_SUCCESSFULLY_SYNCED', $source)];
-        return _t('SOURCE_SUCCESSFULLY_SYNCED', ['source' => $source]);
+        return _t('SOURCE_SUCCESSFULLY_SYNCED', ['source' => $source])
+            . ' ' . _t('IMPORTER_ELAPSED_TIME', ['duration' => $this->formatDuration($startTime)]);
+    }
+
+    private function formatDuration(float $startTime): string
+    {
+        return number_format(microtime(true) - $startTime, 2) . 's';
     }
 
     public function curl($url, $headers = [], $isPost = false, $postData = null, $noSSLCheck = false, $showHeader = false, $timeoutInSec = 10)
