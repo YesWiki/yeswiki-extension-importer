@@ -1,5 +1,45 @@
 <h1>{{ _t('Admin des importers') }}</h1>
+
+{% if message is not null %}
+<div class="alert alert-success">{{ message }}</div>
+{% endif %}
+
+{% if dataSources is not empty %}
+<table class="table">
+  <thead>
+    <tr>
+      <th>{{ _t('IMPORTER_SOURCE_ID') }}</th>
+      <th>{{ _t('IMPORTER_SOURCE_TYPE') }}</th>
+      <th>{{ _t('IMPORTER_SOURCE_URL') }}</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for id,source in dataSources %}
+    <tr>
+      <td>{{ id }}</td>
+      <td>{{ _t('IMPORTER_' ~ (source.importer|default(''))|upper) }}</td>
+      <td>{{ source.url|default('') }}</td>
+      <td>
+        <form method="POST" action="{{currentUrl}}" style="display:inline">
+          <input type="hidden" name="delete" value="{{ id }}">
+          <button class="btn btn-danger btn-xs" type="submit" onclick="return confirm('{{ _t('IMPORTER_CONFIRM_DELETE') }}')">{{ _t('BAZ_SUPPRIMER') }}</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2>{{ _t('IMPORTER_ADD_SOURCE') }}</h2>
 <form method="POST" action="{{currentUrl}}">
+  <div class="form-group">
+    <label for="id" class="control-label">{{ _t('IMPORTER_SOURCE_ID') }}</label>
+    <div class="">
+      <input type="text" class="form-control" id="id" name="id" placeholder="{{ _t('IMPORTER_SOURCE_ID')}}">
+    </div>
+  </div>
   <div class="form-group">
     <div class="bazar-radio-rows bazar-radio radio_required">
     {% for name,class in importers %}

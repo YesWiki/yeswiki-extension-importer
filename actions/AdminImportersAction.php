@@ -3,11 +3,16 @@
 /**
  * Admin importers.
  */
+use YesWiki\Core\Service\ConfigurationFileProvider;
+use YesWiki\Core\Service\ConfigurationService;
 use YesWiki\Core\YesWikiAction;
 use YesWiki\Importer\Service\ImporterManager;
 
 class AdminImportersAction extends YesWikiAction
 {
+    // fields that are posted as "{field}{importer}" (e.g. "urlYesWikiList") and stored under "{field}"
+    private const IMPORTER_SPECIFIC_KEYS = ['url', 'listId', 'title'];
+
     public function run()
     {
         if (!$this->wiki->UserIsAdmin()) {
@@ -16,26 +21,49 @@ class AdminImportersAction extends YesWikiAction
                 'message' => get_class($this) . ' : ' . _t('BAZ_NEED_ADMIN_RIGHTS'),
             ]);
         }
-        if (!empty($_POST)) {
-            if (empty($_POST['id'])) {
-                // generate a unique key if not exists
-                $_POST['id'] = $this->generateId();
-            }
-            $keys = ['url', 'listId'];
-            foreach ($keys as $key) {
-                if (!empty($_POST[$key.$_POST['importer']])) {
-                    $_POST[$key] = $_POST[$key.$_POST['importer']];
-                    unset($_POST[$key.$_POST['importer']]);
+
+        $configFile = ConfigurationFileProvider::getConfigFileFromEnv();
+        if (!is_writable($configFile)) {
+            return $this->render('@templates/alert-message.twig', [
+                'type' => 'danger',
+                'message' => _t('ERROR_NO_ACCESS') . ' ' . _t('FILE_WRITE_PROTECTED'),
+            ]);
+        }
+
+        $config = $this->getService(ConfigurationService::class)->getConfiguration($configFile);
+        $config->load();
+        $dataSources = isset($config->dataSources) && is_array($config->dataSources) ? $config->dataSources : [];
+
+        $message = null;
+        if (!empty($_POST['delete']) && isset($dataSources[$_POST['delete']])) {
+            unset($dataSources[$_POST['delete']]);
+            $config->dataSources = $dataSources;
+            $config->write();
+            $message = _t('IMPORTER_SOURCE_DELETED');
+        } elseif (!empty($_POST['importer'])) {
+            $id = !empty($_POST['id']) ? $_POST['id'] : $this->generateId();
+            $sourceOptions = ['importer' => $_POST['importer']];
+            foreach (self::IMPORTER_SPECIFIC_KEYS as $key) {
+                if (!empty($_POST[$key . $_POST['importer']])) {
+                    $sourceOptions[$key] = $_POST[$key . $_POST['importer']];
                 }
             }
-            dump($_POST);
-
+            if (!empty($_POST['formId'])) {
+                $sourceOptions['formId'] = $_POST['formId'];
+            }
+            $dataSources[$id] = $sourceOptions;
+            $config->dataSources = $dataSources;
+            $config->write();
+            $message = _t('IMPORTER_SOURCE_SAVED');
         }
+
         $importerManager = $this->getService(ImporterManager::class);
         $importers = $importerManager->getAvailableImporters();
         return $this->render('@importer/admin-importers.twig', [
             'currentUrl' => $this->wiki->href(),
-            'importers' => $importers
+            'importers' => $importers,
+            'dataSources' => $dataSources,
+            'message' => $message,
         ]);
     }
 

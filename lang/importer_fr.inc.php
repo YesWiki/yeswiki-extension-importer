@@ -11,5 +11,12 @@ return [
     'IMPORTER_BAZAR_ID' => 'Identifiant de formulaire Bazar lié',
     'SOURCE_SUCCESSFULLY_SYNCED'  => 'Source "%{source}" synchronisée avec succès.',
     'IMPORTER_SYNC_RUN' => 'Lancer la synchronisation',
+    'IMPORTER_ADD_SOURCE' => 'Ajouter une source',
+    'IMPORTER_SOURCE_ID' => 'Identifiant de la source',
+    'IMPORTER_SOURCE_TYPE' => 'Type',
+    'IMPORTER_SOURCE_URL' => 'Url',
+    'IMPORTER_SOURCE_SAVED' => 'La source a été enregistrée dans la configuration.',
+    'IMPORTER_SOURCE_DELETED' => 'La source a été supprimée de la configuration.',
+    'IMPORTER_CONFIRM_DELETE' => 'Voulez-vous vraiment supprimer cette source ?',
 
 ];

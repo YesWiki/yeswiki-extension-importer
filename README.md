@@ -16,6 +16,14 @@ premier temps sera la source de vérité.
 
 ## Configuration
 
+Deux façons d'ajouter une source :
+
+- à la main, en ajoutant des entrées au tableau `dataSources` dans
+  `wakka.config.php`
+- via la page d'admin des importers (`{{adminimporters}}`, action
+  `AdminImportersAction`), qui écrit/supprime directement les sources dans
+  `wakka.config.php`
+
 add arrays of dataSources in wakka.config.php
 
 ```php
