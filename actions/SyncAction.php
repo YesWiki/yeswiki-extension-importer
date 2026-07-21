@@ -17,8 +17,22 @@ class SyncAction extends YesWikiAction
         $returnCode = null;
 
         if (!empty($_POST['sync'])) {
+            // a sync can take much longer than a regular request (remote wikis, large
+            // forms/entries/lists); exec() blocks this script, so its own execution time
+            // limit would otherwise kill this admin-triggered, one-off action
+            set_time_limit(0);
+
             $yeswikiRoot = getcwd();
-            $cmd = escapeshellcmd($yeswikiRoot . '/yeswicli') . ' importer:sync 2>&1';
+            // Call the console entrypoint directly instead of the "yeswicli" bash wrapper:
+            // that wrapper shells out to a bare "php", which isn't resolvable from a
+            // PHP-FPM/webserver process whose PATH doesn't include it (e.g. NixOS), even
+            // though it works fine from an interactive shell. PHP_BINDIR reliably points to
+            // the CLI's own bin directory regardless of the current SAPI.
+            $phpBinary = PHP_BINDIR . '/php';
+            if (!is_executable($phpBinary)) {
+                $phpBinary = 'php';
+            }
+            $cmd = escapeshellarg($phpBinary) . ' ' . escapeshellarg($yeswikiRoot . '/includes/commands/console') . ' importer:sync 2>&1';
             exec($cmd, $outputLines, $returnCode);
             $output = implode("\n", $outputLines);
         }

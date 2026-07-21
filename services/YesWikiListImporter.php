@@ -53,6 +53,21 @@ class YesWikiListImporter extends Importer
         return $config;
     }
 
+    public static function getAdminFields(): array
+    {
+        return [
+            'url' => ['type' => 'url', 'required' => true],
+            'listId' => ['type' => 'text', 'required' => true],
+            'title' => ['type' => 'text', 'required' => false],
+            'noSSLCheck' => ['type' => 'checkbox', 'required' => false],
+        ];
+    }
+
+    public static function needsBazarForm(): bool
+    {
+        return false;
+    }
+
     public function getData()
     {
         $response = $this->importerManager->curl(

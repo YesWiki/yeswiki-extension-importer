@@ -5,14 +5,17 @@ premier temps sera la source de vérité.
 
 ## Use cases
 
-- yunohost listes d'apps publiques/privées `YunohostAppImporter`
 - Flux RSS `RssImporter`
 - json custom Odoo events `OdooEventsImporter`
 - caldav/cardcard
 - peertube en embed
 - mastodon activityPub
 - YesWiki to YesWiki (liste de fiches `id_fiche`/`bf_titre`) `YesWikiListImporter`
+- YesWiki to YesWiki (fiches Bazar complètes) `YesWikiToYesWikiImporter`
 - Données géographiques de l'état
+- yunohost listes d'apps/utilisateurices publiques/privées : voir l'extension
+  `yeswiki-extension-yunohost` (`YunohostCLIAppImporter`/`YunohostCLIUserImporter`),
+  qui fournit ses propres importers compatibles avec cette extension
 
 ## Configuration
 
@@ -61,6 +64,60 @@ d'un formulaire Bazar).
 par le contenu à jour de l'url distante (les clés/labels disparus côté source
 disparaissent aussi localement).
 
+### `YesWikiToYesWiki`
+
+Importe les fiches Bazar (tous les champs) d'un formulaire d'un autre YesWiki
+vers un formulaire local, en s'authentifiant sur le wiki distant avec un
+compte admin. Deux modes de synchronisation :
+
+- **`source_of_truth`** : miroir complet et continu. Le formulaire local, les
+  listes utilisées par ses champs et les fiches sont systématiquement
+  synchronisés pour être identiques au wiki distant, y compris les
+  suppressions (fiches ou valeurs de liste disparues côté distant sont aussi
+  supprimées localement).
+- **`allow_local`** : synchronisation souple. Le formulaire local peut être
+  différent (une correspondance de champs est demandée depuis
+  `{{adminimporters}}` dès que le formulaire local existe déjà) ; les listes
+  sont fusionnées (les valeurs distantes sont ajoutées, les valeurs
+  locales sont toujours conservées, rien n'est jamais supprimé) ; les fiches
+  sont créées/mises à jour mais jamais supprimées, et une fiche modifiée
+  localement depuis la dernière synchro n'est plus resynchronisée (pour ne
+  pas écraser une modification locale).
+
+Si le formulaire local (`formId`) n'existe pas encore, il est créé avec
+exactement les mêmes champs (mêmes identifiants) que le formulaire distant,
+quel que soit le mode.
+
+```php
+ 'dataSources' => [
+        'mon-autre-yeswiki' => [
+            'importer' => 'YesWikiToYesWiki',
+            'url' => 'https://distant.example.org',
+            'auth' => ['user' => 'admin', 'password' => '...'],
+            'remoteFormId' => '12',
+            'formId' => '30',
+            'localAdminUser' => 'admin', // voir note ACL ci-dessous
+            'syncMode' => 'source_of_truth', // ou 'allow_local'
+            // 'fieldsMapping' => ['bf_titre_distant' => 'bf_titre_local', ...], // requis en allow_local si formId existe déjà
+            // 'noSSLCheck' => false,
+        ]
+    ],
+```
+
+L'identité fiche distante ↔ fiche locale et la fusion/mise à jour ne
+reposent pas sur des champs cachés ajoutés au formulaire : elles utilisent le
+triple `source_url` existant (même mécanisme que les autres importers de
+cette extension) et un triple dédié pour la date de dernière synchro.
+
+**`localAdminUser`** : `EntryManager::update()` vérifie toujours les ACL en
+écriture de la fiche visée par rapport à l'utilisateur·ice actuellement
+connecté·e (contrairement à la création, qui les ignore) ; or une synchro
+CLI/cron ne connecte personne. Sans `localAdminUser` renseigné (nom
+d'utilisateur·ice d'un compte admin local), la mise à jour de fiches déjà
+existantes échouera par manque de droits dès la 2ᵉ synchro (message
+"Vous n'avez pas les permissions pour éditer ce fichier" dans le journal). La
+création de nouvelles fiches n'est pas concernée.
+
 ## Utilisation
 
 **Dans le répertoire racine du yeswiki**.
@@ -108,6 +165,45 @@ curl -H "secret: un-secret-a-generer" "https://mon-yeswiki.fr/?api/sync"
 La réponse JSON contient, pour chaque source configurée, le même message que
 `./yeswicli importer:sync` (succès avec durée, ou erreur). Sans secret configuré
 ou avec un secret invalide, la route répond `401`.
+
+## Importers fournis par d'autres extensions
+
+N'importe quelle extension active peut fournir son propre importer : il
+suffit d'y créer une classe `services/XxxImporter.php` (namespace libre) qui
+étend `YesWiki\Importer\Service\Importer`, exactement comme les importers de
+cette extension. `ImporterManager::getAvailableImporters()` les découvre tous
+automatiquement (recherche de tout service dont le nom se termine par
+`Importer`), quelle que soit l'extension qui les déclare, donc `./yeswicli
+importer:sync` et la route `/api/sync` les prennent en charge sans rien de
+plus à faire.
+
+Pour que la page d'admin (`{{adminimporters}}`) sache aussi proposer/éditer
+leur configuration, l'importer peut déclarer ses champs en surchargeant deux
+méthodes statiques de `Importer` :
+
+```php
+public static function getAdminFields(): array
+{
+    return [
+        // 'clé' => ['type' => 'text'|'url'|'password'|'checkbox', 'required' => bool]
+        'lang' => ['type' => 'text', 'required' => true],
+    ];
+}
+
+public static function needsBazarForm(): bool
+{
+    // false si l'importer ne crée pas de fiches Bazar (comme YesWikiListImporter)
+    return true;
+}
+```
+
+Sans surcharge, `getAdminFields()` renvoie `[]` et `needsBazarForm()` renvoie
+`true` (valeurs par défaut de la classe abstraite) : l'importer reste
+utilisable en CLI/API, seule la page d'admin n'aura pas de champ dédié pour
+lui (à ajouter à la main dans `wakka.config.php`).
+
+C'est ce que fait `yeswiki-extension-yunohost` pour ses importers
+`YunohostCLIAppImporter`/`YunohostCLIUserImporter`.
 
 ## Idées
 

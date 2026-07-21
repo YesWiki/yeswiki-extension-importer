@@ -72,6 +72,115 @@ class ImporterManager
         return false;
     }
 
+    /**
+     * Build a dataSources entry for $importer from the generic "{key}{importer}" input fields
+     * declared by that importer's getAdminFields(). $input is a plain array keyed the same way
+     * whether it comes from $_POST (AdminImportersAction) or a Symfony Request's ParameterBag
+     * (ApiController's AJAX field-mapping endpoint), so both callers share this logic.
+     */
+    public function collectSourceOptionsFromInput(string $importer, array $importerFields, array $input): array
+    {
+        $available = $this->getAvailableImporters();
+        $className = $available[$importer] ?? null;
+        $sourceOptions = ['importer' => $importer];
+        foreach ($importerFields[$importer] ?? [] as $key => $field) {
+            $postKey = $key . $importer;
+            if (($field['type'] ?? null) === 'checkbox') {
+                $value = !empty($input[$postKey]);
+            } elseif (!empty($input[$postKey])) {
+                $value = $input[$postKey];
+            } else {
+                continue;
+            }
+            if ($className && is_callable([$className, 'normalizeAdminFieldValue'])) {
+                $value = $className::normalizeAdminFieldValue($key, $value);
+            }
+            if (strpos($key, 'auth_') === 0) {
+                $sourceOptions['auth'][substr($key, 5)] = $value;
+            } else {
+                $sourceOptions[$key] = $value;
+            }
+        }
+        if (!empty($input['formId'])) {
+            $sourceOptions['formId'] = $input['formId'];
+        }
+        return $sourceOptions;
+    }
+
+    /**
+     * Build the remote/local field lists for the mapping table when $importer is pointed at an
+     * existing local form: fields come from the importer's fixed getOwnFields() list, or (e.g.
+     * YesWikiToYesWiki) are fetched from the remote form referenced in $sourceOptions. Returns
+     * null if there's nothing to map against (no own fields and the remote fetch failed).
+     */
+    public function getFieldMapping(string $importer, array $sourceOptions, array $localForm): ?array
+    {
+        $available = $this->getAvailableImporters();
+        $className = $available[$importer] ?? null;
+        $ownFields = $className && is_callable([$className, 'getOwnFields']) ? $className::getOwnFields() : [];
+        $remoteFields = !empty($ownFields) ? $ownFields : $this->fetchRemoteFormFields($sourceOptions);
+        if (empty($remoteFields)) {
+            return null;
+        }
+        return [
+            'remote' => $remoteFields,
+            'local' => $this->fieldsAsList($localForm['prepared'] ?? []),
+        ];
+    }
+
+    /**
+     * Log into the remote wiki and fetch its form's fields (key + label), to build the
+     * field-mapping table. Returns null on any failure.
+     */
+    private function fetchRemoteFormFields(array $sourceOptions): ?array
+    {
+        if (empty($sourceOptions['url']) || empty($sourceOptions['remoteFormId'])) {
+            return null;
+        }
+        $noSSLCheck = !empty($sourceOptions['noSSLCheck']);
+
+        $loginResponse = $this->curl(
+            rtrim($sourceOptions['url'], '/') . '/?api/login',
+            ['Content-Type: application/x-www-form-urlencoded'],
+            true,
+            http_build_query([
+                'username' => $sourceOptions['auth']['user'] ?? '',
+                'password' => $sourceOptions['auth']['password'] ?? '',
+            ]),
+            $noSSLCheck,
+            true
+        );
+        preg_match_all('/^Set-Cookie:\s*([^;]*)/mi', $loginResponse, $matches);
+        $cookie = implode('; ', $matches[1]);
+
+        $formResponse = $this->curl(
+            rtrim($sourceOptions['url'], '/') . '/?api/forms/' . $sourceOptions['remoteFormId'],
+            ['Cookie: ' . $cookie],
+            false,
+            [],
+            $noSSLCheck
+        );
+        $remoteForm = json_decode($formResponse, true);
+        if (empty($remoteForm['bn_template'])) {
+            return null;
+        }
+
+        $templateLines = $this->formManager->parseTemplate($remoteForm['bn_template']);
+        return $this->fieldsAsList($this->formManager->prepareData(['template' => $templateLines]));
+    }
+
+    private function fieldsAsList(array $fields): array
+    {
+        $result = [];
+        foreach ($fields as $field) {
+            // skip layout-only fields (tabs, labelhtml, acls, ...): they have no property name
+            if ($field && !empty($field->getPropertyName())) {
+                $result[] = ['key' => $field->getPropertyName(), 'label' => $field->getLabel()];
+            }
+        }
+        return $result;
+    }
+
     public function syncSource($source, $sourceOptions)
     {
         $startTime = microtime(true);
@@ -118,7 +227,6 @@ class ImporterManager
         }
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($ch);
-        curl_close($ch);
         $errors = curl_error($ch);
         if (!empty($errors)) {
             var_dump($errors);
@@ -148,7 +256,6 @@ class ImporterManager
             if (!empty($errors)) {
                 var_dump($errors);
             }
-            curl_close($ch);
             fclose($fp);
         }
         return $destFile;

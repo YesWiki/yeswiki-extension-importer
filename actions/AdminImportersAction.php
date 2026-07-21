@@ -3,6 +3,7 @@
 /**
  * Admin importers.
  */
+use YesWiki\Bazar\Service\FormManager;
 use YesWiki\Core\Service\ConfigurationFileProvider;
 use YesWiki\Core\Service\ConfigurationService;
 use YesWiki\Core\YesWikiAction;
@@ -10,9 +11,6 @@ use YesWiki\Importer\Service\ImporterManager;
 
 class AdminImportersAction extends YesWikiAction
 {
-    // fields that are posted as "{field}{importer}" (e.g. "urlYesWikiList") and stored under "{field}"
-    private const IMPORTER_SPECIFIC_KEYS = ['url', 'listId', 'title'];
-
     public function run()
     {
         if (!$this->wiki->UserIsAdmin()) {
@@ -30,26 +28,68 @@ class AdminImportersAction extends YesWikiAction
             ]);
         }
 
+        $importerManager = $this->getService(ImporterManager::class);
+        $importers = $importerManager->getAvailableImporters();
+        $formManager = $this->getService(FormManager::class);
+        // each importer class (from this extension or any other) declares its own admin
+        // fields via Importer::getAdminFields()/needsBazarForm(), so this action stays
+        // extension-agnostic instead of hardcoding a field list per importer name
+        $importerFields = [];
+        $importersWithoutForm = [];
+        // an importer can offer field-mapping either from a fixed field list (getOwnFields(),
+        // e.g. Rss/Imap) or by fetching an arbitrary remote form's fields live via the
+        // mapping-fields AJAX endpoint (e.g. YesWikiToYesWiki, detected here by its
+        // "remoteFormId" admin field)
+        $importersWithFieldMapping = [];
+        foreach ($importers as $shortName => $className) {
+            $fields = is_callable([$className, 'getAdminFields']) ? $className::getAdminFields() : [];
+            $importerFields[$shortName] = $fields;
+            $needsForm = is_callable([$className, 'needsBazarForm']) ? $className::needsBazarForm() : true;
+            if (!$needsForm) {
+                $importersWithoutForm[] = $shortName;
+            }
+            $hasOwnFields = is_callable([$className, 'getOwnFields']) && !empty($className::getOwnFields());
+            if ($hasOwnFields || array_key_exists('remoteFormId', $fields)) {
+                $importersWithFieldMapping[] = $shortName;
+            }
+        }
+
         $config = $this->getService(ConfigurationService::class)->getConfiguration($configFile);
         $config->load();
         $dataSources = isset($config->dataSources) && is_array($config->dataSources) ? $config->dataSources : [];
 
+        // the admin no longer types a raw formId: "new" means "create a form, pick its id now"
+        if (($_POST['formId'] ?? '') === 'new') {
+            $_POST['formId'] = (string) $formManager->findNewId();
+        }
+
         $message = null;
+        $syncOutput = null;
+        $syncedSourceId = null;
+
         if (!empty($_POST['delete']) && isset($dataSources[$_POST['delete']])) {
             unset($dataSources[$_POST['delete']]);
             $config->dataSources = $dataSources;
             $config->write();
             $message = _t('IMPORTER_SOURCE_DELETED');
+        } elseif (!empty($_POST['syncSource']) && isset($dataSources[$_POST['syncSource']])) {
+            $syncedSourceId = $_POST['syncSource'];
+            // a sync can take a while (remote wikis, large forms/entries/lists); this is an
+            // admin-triggered, one-off action so the regular script execution time limit
+            // would otherwise cut it short
+            set_time_limit(0);
+            ob_start();
+            $result = $importerManager->syncSource($syncedSourceId, $dataSources[$syncedSourceId]);
+            $syncOutput = trim(ob_get_clean() . "\n" . $result);
         } elseif (!empty($_POST['importer'])) {
-            $id = !empty($_POST['id']) ? $_POST['id'] : $this->generateId();
-            $sourceOptions = ['importer' => $_POST['importer']];
-            foreach (self::IMPORTER_SPECIFIC_KEYS as $key) {
-                if (!empty($_POST[$key . $_POST['importer']])) {
-                    $sourceOptions[$key] = $_POST[$key . $_POST['importer']];
+            $importer = $_POST['importer'];
+            $sourceOptions = $importerManager->collectSourceOptionsFromInput($importer, $importerFields, $_POST);
+            $id = !empty($_POST['id']) ? $_POST['id'] : $this->generateId($importer, $sourceOptions);
+            if (!empty($_POST['fieldsMapping']) && is_array($_POST['fieldsMapping'])) {
+                $fieldsMapping = array_filter($_POST['fieldsMapping']);
+                if (!empty($fieldsMapping)) {
+                    $sourceOptions['fieldsMapping'] = $fieldsMapping;
                 }
-            }
-            if (!empty($_POST['formId'])) {
-                $sourceOptions['formId'] = $_POST['formId'];
             }
             $dataSources[$id] = $sourceOptions;
             $config->dataSources = $dataSources;
@@ -57,27 +97,28 @@ class AdminImportersAction extends YesWikiAction
             $message = _t('IMPORTER_SOURCE_SAVED');
         }
 
-        $importerManager = $this->getService(ImporterManager::class);
-        $importers = $importerManager->getAvailableImporters();
         return $this->render('@importer/admin-importers.twig', [
             'currentUrl' => $this->wiki->href(),
             'importers' => $importers,
+            'importerFields' => $importerFields,
+            'importersWithoutForm' => $importersWithoutForm,
+            'importersWithFieldMapping' => $importersWithFieldMapping,
+            'forms' => $formManager->getAll(),
             'dataSources' => $dataSources,
+            'dataSourcesJson' => json_encode($dataSources, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP),
             'message' => $message,
+            'syncOutput' => $syncOutput,
+            'syncedSourceId' => $syncedSourceId,
         ]);
     }
 
-    public function generateId(): string
+    /**
+     * Derive a stable id from the source's type and url, so re-saving the same source
+     * (same importer + url) keeps producing the same id instead of a random one.
+     */
+    public function generateId(string $importer, array $sourceOptions): string
     {
-        $data = random_bytes(16);
-        assert(strlen($data) == 16);
-
-        // Set version to 0100
-        $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
-        // Set bits 6-7 to 10
-        $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
-
-        // Output the 36 character UUID.
-        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+        $url = $sourceOptions['url'] ?? $sourceOptions['imap_server_and_folder'] ?? '';
+        return strtolower($importer) . '_' . substr(sha1($importer . '|' . $url), 0, 12);
     }
 }

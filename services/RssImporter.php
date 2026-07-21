@@ -72,6 +72,25 @@ EOT,
         return $config;
     }
 
+    public static function getAdminFields(): array
+    {
+        return [
+            'url' => ['type' => 'url', 'required' => true],
+        ];
+    }
+
+    // bf_url is excluded on purpose: syncData() relies on it verbatim as the entry's dedup/identity key
+    public static function getOwnFields(): array
+    {
+        return [
+            ['key' => 'bf_titre', 'label' => 'Titre'],
+            ['key' => 'bf_auteurice', 'label' => 'Auteurices'],
+            ['key' => 'bf_categories', 'label' => 'Catégories'],
+            ['key' => 'bf_chapeau', 'label' => 'Résumé'],
+            ['key' => 'bf_description', 'label' => 'Contenu'],
+        ];
+    }
+
     public function getData()
     {
         // we use existing lib
@@ -79,11 +98,23 @@ EOT,
         $feed = new \SimplePie();
         $feed->set_feed_url($this->config['url']);
         $feed->enable_cache(true);
-        $feed->init();
-        $feed->handle_content_type();
         $data = [];
-        if ($feed) {
+        // the vendored SimplePie lib triggers PHP 8.1+ "null as array offset" deprecation
+        // notices internally (e.g. IRI::scheme_normalization() on a null scheme); it's
+        // third-party code we don't maintain, so silence only E_DEPRECATED for the
+        // duration of this call instead of patching vendor or hiding other error types
+        set_error_handler(static function (int $errno) {
+            return $errno === E_DEPRECATED;
+        }, E_DEPRECATED);
+        try {
+            $feed->init();
+            $feed->handle_content_type();
+            if ($feed->error()) {
+                echo 'Erreur lors de la récupération du flux RSS "' . $this->config['url'] . '" : ' . $feed->error() . "\n";
+                return $data;
+            }
             $rssItems = $feed->get_items();
+            echo count($rssItems) . ' article(s) trouvé(s) dans le flux.' . "\n";
             foreach ($rssItems as $item) {
                 $content = $item->get_content();
                 preg_match_all(
@@ -92,6 +123,15 @@ EOT,
                     $matches
                 );
                 $img = $matches[1][0] ?? '';
+                if (empty($img)) {
+                    // fallback to media:content/media:thumbnail/enclosure (e.g. Le Monde RSS feeds)
+                    if ($enclosure = $item->get_enclosure()) {
+                        $img = $enclosure->get_thumbnail() ?: $enclosure->get_link();
+                    }
+                }
+                if (empty($img) && ($thumbnail = $item->get_thumbnail())) {
+                    $img = $thumbnail['url'] ?? '';
+                }
                 $cats = [];
                 $categories = $item->get_categories();
                 if (!empty($categories)) {
@@ -113,6 +153,8 @@ EOT,
                     'image' => $img
                 ];
             }
+        } finally {
+            restore_error_handler();
         }
         return $data;
     }
@@ -122,14 +164,16 @@ EOT,
         $preparedData = [];
         $converter = new HtmlConverter(array('strip_tags' => true)); // we will convert html to md, but safe
         foreach ($data as $i => $item) {
-            $preparedData[$i]['bf_titre'] = $item['title'];
-            $preparedData[$i]['bf_auteurice'] = $item['author'];
-            $preparedData[$i]['bf_categories'] = implode(', ', $item['categories']);
-            $preparedData[$i]['bf_description'] = $converter->convert($item['content']);
-            $preparedData[$i]['bf_chapeau'] = $converter->convert($item['summary']);
-            $preparedData[$i]['bf_url'] = $item['link'];
-            $preparedData[$i]['date_creation_fiche'] = $item['date'];
-            $preparedData[$i]['imagebf_image'] = $this->importerManager->downloadFile($item['image']);
+            $entry = [];
+            $entry['bf_titre'] = $item['title'];
+            $entry['bf_auteurice'] = $item['author'];
+            $entry['bf_categories'] = implode(', ', $item['categories']);
+            $entry['bf_description'] = $converter->convert($item['content']);
+            $entry['bf_chapeau'] = $converter->convert($item['summary']);
+            $entry['bf_url'] = $item['link'];
+            $entry['date_creation_fiche'] = $item['date'];
+            $entry['imagebf_image'] = $this->importerManager->downloadFile($item['image']);
+            $preparedData[$i] = $this->applyFieldsMapping($entry);
         }
         return $preparedData;
     }
@@ -142,8 +186,9 @@ EOT,
             if (!$res) {
                 $entry['antispam'] = 1;
                 $this->entryManager->create($this->config['formId'], $entry, false, $entry['bf_url']);
+                echo 'L\'article "'.($entry['bf_titre'] ?? $entry['bf_url']).'" créé.'."\n";
             } else {
-                echo 'L\'article "'.$entry['bf_titre'].'" existe déja.'."\n";
+                echo 'L\'article "'.($entry['bf_titre'] ?? $entry['bf_url']).'" existe déja.'."\n";
             }
         }
         return;

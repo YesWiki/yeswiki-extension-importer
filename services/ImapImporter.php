@@ -78,6 +78,29 @@ EOT,
         return $config;
     }
 
+    public static function getAdminFields(): array
+    {
+        return [
+            'imap_server_and_folder' => ['type' => 'text', 'required' => true],
+            'imap_user' => ['type' => 'text', 'required' => true],
+            'imap_password' => ['type' => 'password', 'required' => true],
+            'imap_query' => ['type' => 'text', 'required' => true],
+            'attachments_folder' => ['type' => 'text', 'required' => false],
+        ];
+    }
+
+    // message_id is excluded on purpose: syncData() relies on it verbatim as the entry's dedup/identity key
+    public static function getOwnFields(): array
+    {
+        return [
+            ['key' => 'bf_titre', 'label' => 'Sujet'],
+            ['key' => 'bf_date', 'label' => 'Date de réception'],
+            ['key' => 'bf_auteurice', 'label' => 'Emeteurice'],
+            ['key' => 'bf_auteurice_email', 'label' => 'Email émeteurice'],
+            ['key' => 'bf_description', 'label' => 'Message'],
+        ];
+    }
+
     public function authenticate()
     {
         // Create PhpImap\Mailbox instance for all further actions
@@ -132,12 +155,14 @@ EOT,
             } else {
                 $message = $email->textPlain;
             }
-            $preparedData[$i]['bf_titre'] = $email->subject;
-            $preparedData[$i]['bf_auteurice'] = (string) ($email->fromName ?? $email->fromAddress);
-            $preparedData[$i]['bf_auteurice_email'] = (string) $email->fromAddress;
-            $preparedData[$i]['bf_description'] = $converter->convert($message);
-            $preparedData[$i]['message_id'] = trim($i, '<>');
-            $preparedData[$i]['date_creation_fiche'] = $preparedData[$i]['bf_date'] = date_format(date_create($email->date), 'Y-m-d H:i:s');
+            $entry = [];
+            $entry['bf_titre'] = $email->subject;
+            $entry['bf_auteurice'] = (string) ($email->fromName ?? $email->fromAddress);
+            $entry['bf_auteurice_email'] = (string) $email->fromAddress;
+            $entry['bf_description'] = $converter->convert($message);
+            $entry['message_id'] = trim($i, '<>');
+            $entry['date_creation_fiche'] = $entry['bf_date'] = date_format(date_create($email->date), 'Y-m-d H:i:s');
+            $preparedData[$i] = $this->applyFieldsMapping($entry);
         }
         return $preparedData;
     }
@@ -150,9 +175,9 @@ EOT,
             if (!$res) {
                 $entry['antispam'] = 1;
                 $this->entryManager->create($this->config['formId'], $entry, false, $entry['message_id']);
-                echo 'L\'email "' . $entry['bf_titre'] . '" a été créé.' . "\n";
+                echo 'L\'email "' . ($entry['bf_titre'] ?? $entry['message_id']) . '" a été créé.' . "\n";
             } else {
-                echo 'L\'email "' . $entry['bf_titre'] . '" existe déja.' . "\n";
+                echo 'L\'email "' . ($entry['bf_titre'] ?? $entry['message_id']) . '" existe déja.' . "\n";
             }
         }
         return;
