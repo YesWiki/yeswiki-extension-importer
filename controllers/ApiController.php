@@ -45,9 +45,9 @@ class ApiController extends YesWikiController
             return new ApiResponse(['error' => 'Unauthorized'], 403);
         }
 
-        $request = $this->getRequest();
-        $importer = (string) $request->request->get('importer');
-        $formId = (string) $request->request->get('formId');
+        $request = $this->wiki->request;
+        $importer = (string) $request->request->get('importer', '');
+        $formId = (string) $request->request->get('formId', '');
 
         if (empty($importer) || empty($formId) || $formId === 'new') {
             return new ApiResponse(['fieldMapping' => null]);

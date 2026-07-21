@@ -58,22 +58,28 @@ class AdminImportersAction extends YesWikiAction
         $config->load();
         $dataSources = isset($config->dataSources) && is_array($config->dataSources) ? $config->dataSources : [];
 
+        $request = $this->wiki->request;
+
         // the admin no longer types a raw formId: "new" means "create a form, pick its id now"
-        if (($_POST['formId'] ?? '') === 'new') {
-            $_POST['formId'] = (string) $formManager->findNewId();
+        if ($request->request->get('formId', '') === 'new') {
+            $request->request->set('formId', (string) $formManager->findNewId());
         }
 
         $message = null;
         $syncOutput = null;
         $syncedSourceId = null;
 
-        if (!empty($_POST['delete']) && isset($dataSources[$_POST['delete']])) {
-            unset($dataSources[$_POST['delete']]);
+        $delete = $request->request->get('delete');
+        $syncSource = $request->request->get('syncSource');
+        $importer = $request->request->get('importer');
+
+        if (!empty($delete) && isset($dataSources[$delete])) {
+            unset($dataSources[$delete]);
             $config->dataSources = $dataSources;
             $config->write();
             $message = _t('IMPORTER_SOURCE_DELETED');
-        } elseif (!empty($_POST['syncSource']) && isset($dataSources[$_POST['syncSource']])) {
-            $syncedSourceId = $_POST['syncSource'];
+        } elseif (!empty($syncSource) && isset($dataSources[$syncSource])) {
+            $syncedSourceId = $syncSource;
             // a sync can take a while (remote wikis, large forms/entries/lists); this is an
             // admin-triggered, one-off action so the regular script execution time limit
             // would otherwise cut it short
@@ -81,15 +87,12 @@ class AdminImportersAction extends YesWikiAction
             ob_start();
             $result = $importerManager->syncSource($syncedSourceId, $dataSources[$syncedSourceId]);
             $syncOutput = trim(ob_get_clean() . "\n" . $result);
-        } elseif (!empty($_POST['importer'])) {
-            $importer = $_POST['importer'];
-            $sourceOptions = $importerManager->collectSourceOptionsFromInput($importer, $importerFields, $_POST);
-            $id = !empty($_POST['id']) ? $_POST['id'] : $this->generateId($importer, $sourceOptions);
-            if (!empty($_POST['fieldsMapping']) && is_array($_POST['fieldsMapping'])) {
-                $fieldsMapping = array_filter($_POST['fieldsMapping']);
-                if (!empty($fieldsMapping)) {
-                    $sourceOptions['fieldsMapping'] = $fieldsMapping;
-                }
+        } elseif (!empty($importer)) {
+            $sourceOptions = $importerManager->collectSourceOptionsFromInput($importer, $importerFields, $request->request->all());
+            $id = $request->request->get('id') ?: $this->generateId($importer, $sourceOptions);
+            $fieldsMapping = array_filter($request->request->all('fieldsMapping'));
+            if (!empty($fieldsMapping)) {
+                $sourceOptions['fieldsMapping'] = $fieldsMapping;
             }
             $dataSources[$id] = $sourceOptions;
             $config->dataSources = $dataSources;
