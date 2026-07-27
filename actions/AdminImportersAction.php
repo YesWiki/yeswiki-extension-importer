@@ -3,7 +3,7 @@
 /**
  * Admin importers.
  */
-use YesWiki\Bazar\Service\FormManager;
+use YesWiki\Core\Service\FormManager;
 use YesWiki\Core\Service\ConfigurationFileProvider;
 use YesWiki\Core\Service\ConfigurationService;
 use YesWiki\Core\YesWikiAction;

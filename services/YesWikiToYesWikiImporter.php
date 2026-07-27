@@ -4,10 +4,10 @@ namespace YesWiki\Importer\Service;
 
 use Psr\Container\ContainerInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
-use YesWiki\Bazar\Field\EnumField;
-use YesWiki\Bazar\Service\EntryManager;
-use YesWiki\Bazar\Service\FormManager;
-use YesWiki\Bazar\Service\ListManager;
+use YesWiki\Core\Field\EnumField;
+use YesWiki\Core\Service\EntryManager;
+use YesWiki\Core\Service\FormManager;
+use YesWiki\Core\Service\ListManager;
 use YesWiki\Core\Controller\AuthController;
 use YesWiki\Core\Service\PageManager;
 use YesWiki\Core\Service\TripleStore;

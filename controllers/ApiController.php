@@ -3,7 +3,7 @@
 namespace YesWiki\Importer\Controller;
 
 use Symfony\Component\Routing\Annotation\Route;
-use YesWiki\Bazar\Service\FormManager;
+use YesWiki\Core\Service\FormManager;
 use YesWiki\Core\ApiResponse;
 use YesWiki\Core\YesWikiController;
 use YesWiki\Importer\Service\ImporterManager;

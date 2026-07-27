@@ -5,9 +5,9 @@ namespace YesWiki\Importer\Service;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use YesWiki\Importer\Service\ImporterManager;
-use YesWiki\Bazar\Service\EntryManager;
-use YesWiki\Bazar\Service\FormManager;
-use YesWiki\Bazar\Service\ListManager;
+use YesWiki\Core\Service\EntryManager;
+use YesWiki\Core\Service\FormManager;
+use YesWiki\Core\Service\ListManager;
 use League\HTMLToMarkdown\HtmlConverter;
 use YesWiki\Wiki;
 
