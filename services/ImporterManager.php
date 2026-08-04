@@ -43,8 +43,14 @@ class ImporterManager
 
         $importers = [];
         foreach ($services as $serv) {
-            $short = explode('Service\\', $serv)[1];
-            $shortClass = str_replace(['Importer'], '', $short);
+            // service ids are usually class names, but aliases and plain ids can end in
+            // "Importer" too, so work from the last namespace segment instead of assuming
+            // a "…\Service\…" id, and skip the abstract Importer base class itself.
+            $parts = explode('\\', $serv);
+            $shortClass = substr(end($parts), 0, -strlen('Importer'));
+            if ($shortClass === '') {
+                continue;
+            }
             $importers[$shortClass] = $serv;
         }
         return $importers;
