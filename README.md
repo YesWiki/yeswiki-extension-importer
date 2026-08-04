@@ -68,7 +68,17 @@ disparaissent aussi localement).
 
 Importe les fiches Bazar (tous les champs) d'un formulaire d'un autre YesWiki
 vers un formulaire local, en s'authentifiant sur le wiki distant avec un
-compte admin. Deux modes de synchronisation :
+compte admin.
+
+L'`url` à renseigner est celle de l'api json des fiches du formulaire distant,
+de la forme `https://mon-wiki-distant.fr/?api/forms/12/entries/json` : elle
+contient déjà l'identifiant du formulaire distant, il n'y a donc pas à le
+saisir séparément. Les paramètres ajoutés à cette url sont conservés et
+renvoyés à chaque synchronisation, ce qui permet de n'importer qu'une partie
+des fiches (par exemple
+`…/entries/json&query=bf_ville%3DMarseille`).
+
+Deux modes de synchronisation :
 
 - **`source_of_truth`** : miroir complet et continu. Le formulaire local, les
   listes utilisées par ses champs et les fiches sont systématiquement
@@ -88,21 +98,47 @@ Si le formulaire local (`formId`) n'existe pas encore, il est créé avec
 exactement les mêmes champs (mêmes identifiants) que le formulaire distant,
 quel que soit le mode.
 
+Les champs `image` et `fichier` contiennent un nom de fichier relatif au
+dossier des fichiers du wiki **distant** : recopié tel quel il ne pointerait
+sur rien localement. Deux modes (`filesMode`) :
+
+- **`download`** (par défaut) : les images et fichiers sont téléchargés dans
+  le dossier des fichiers du wiki local (`attach_config['upload_path']`, par
+  défaut `files/`), en conservant leur nom d'origine — un fichier déjà
+  présent n'est pas retéléchargé, les synchros suivantes ne coûtent donc
+  rien. Les extensions autorisées sont les mêmes que pour un envoi de fichier
+  classique dans une fiche.
+- **`url`** : les fiches locales gardent une url absolue vers le fichier resté
+  sur le wiki source. Plus léger, mais dépend de la disponibilité du wiki
+  source ; nécessite une version de YesWiki dont les champs `image`/`fichier`
+  acceptent une url comme valeur (les versions plus anciennes videraient le
+  champ).
+
+Le mode `download` suppose le dossier de fichiers « à plat » (comportement par
+défaut de YesWiki) : si le wiki local a activé `no_safe_mode` (un
+sous-dossier de fichiers par page), utiliser le mode `url`.
+
 ```php
  'dataSources' => [
         'mon-autre-yeswiki' => [
             'importer' => 'YesWikiToYesWiki',
-            'url' => 'https://distant.example.org',
+            'url' => 'https://distant.example.org/?api/forms/12/entries/json',
             'auth' => ['user' => 'admin', 'password' => '...'],
-            'remoteFormId' => '12',
             'formId' => '30',
             'localAdminUser' => 'admin', // voir note ACL ci-dessous
             'syncMode' => 'source_of_truth', // ou 'allow_local'
+            'filesMode' => 'download', // ou 'url'
             // 'fieldsMapping' => ['bf_titre_distant' => 'bf_titre_local', ...], // requis en allow_local si formId existe déjà
             // 'noSSLCheck' => false,
+            // 'remoteFilesPath' => 'files', // si le wiki distant n'utilise pas "files/"
         ]
     ],
 ```
+
+L'url est découpée à la lecture de la configuration en `url` (url de base du
+wiki distant), `remoteFormId` et `entriesQuery` : une configuration écrite à
+la main avec ces trois clés séparées (comme avant l'ajout de ce découpage)
+reste donc valable.
 
 L'identité fiche distante ↔ fiche locale et la fusion/mise à jour ne
 reposent pas sur des champs cachés ajoutés au formulaire : elles utilisent le
@@ -185,7 +221,11 @@ méthodes statiques de `Importer` :
 public static function getAdminFields(): array
 {
     return [
-        // 'clé' => ['type' => 'text'|'url'|'password'|'checkbox', 'required' => bool]
+        // 'clé' => ['type' => 'text'|'url'|'password'|'number'|'checkbox'|'select',
+        //           'required' => bool,
+        //           'options' => ['valeur' => 'CLE_DE_TRADUCTION'], // type select uniquement
+        //           'label' => 'CLE_DE_TRADUCTION',  // par défaut IMPORTER_FIELD_{CLÉ}
+        //           'help' => 'CLE_DE_TRADUCTION']   // aide affichée sous le champ
         'lang' => ['type' => 'text', 'required' => true],
     ];
 }
@@ -196,6 +236,19 @@ public static function needsBazarForm(): bool
     return true;
 }
 ```
+
+Trois autres méthodes statiques, optionnelles, complètent ce contrat :
+
+- `hasRemoteFieldMapping()` : `true` si le tableau de correspondance des
+  champs doit être construit en allant chercher en direct les champs d'un
+  formulaire distant (comme `YesWikiToYesWiki`) plutôt qu'à partir de la liste
+  fixe `getOwnFields()`.
+- `normalizeAdminOptions()` / `denormalizeAdminOptions()` : pour un importer
+  dont la configuration ne se déduit pas champ par champ (par exemple une
+  seule url saisie qui porte plusieurs clés de config, comme l'url d'api de
+  `YesWikiToYesWiki`). La première transforme ce qui a été saisi avant
+  enregistrement, la seconde reconstruit ce qui doit être réaffiché dans le
+  formulaire d'édition.
 
 Sans surcharge, `getAdminFields()` renvoie `[]` et `needsBazarForm()` renvoie
 `true` (valeurs par défaut de la classe abstraite) : l'importer reste

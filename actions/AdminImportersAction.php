@@ -38,8 +38,7 @@ class AdminImportersAction extends YesWikiAction
         $importersWithoutForm = [];
         // an importer can offer field-mapping either from a fixed field list (getOwnFields(),
         // e.g. Rss/Imap) or by fetching an arbitrary remote form's fields live via the
-        // mapping-fields AJAX endpoint (e.g. YesWikiToYesWiki, detected here by its
-        // "remoteFormId" admin field)
+        // mapping-fields AJAX endpoint (hasRemoteFieldMapping(), e.g. YesWikiToYesWiki)
         $importersWithFieldMapping = [];
         foreach ($importers as $shortName => $className) {
             $fields = is_callable([$className, 'getAdminFields']) ? $className::getAdminFields() : [];
@@ -49,7 +48,8 @@ class AdminImportersAction extends YesWikiAction
                 $importersWithoutForm[] = $shortName;
             }
             $hasOwnFields = is_callable([$className, 'getOwnFields']) && !empty($className::getOwnFields());
-            if ($hasOwnFields || array_key_exists('remoteFormId', $fields)) {
+            $hasRemoteFields = is_callable([$className, 'hasRemoteFieldMapping']) && $className::hasRemoteFieldMapping();
+            if ($hasOwnFields || $hasRemoteFields) {
                 $importersWithFieldMapping[] = $shortName;
             }
         }
@@ -100,6 +100,10 @@ class AdminImportersAction extends YesWikiAction
             $message = _t('IMPORTER_SOURCE_SAVED');
         }
 
+        // both the sources table and the edit form show what was typed in, not how it ended up
+        // stored (an importer may split one typed value into several config keys)
+        $editableDataSources = $this->editableDataSources($dataSources, $importers);
+
         return $this->render('@importer/admin-importers.twig', [
             'currentUrl' => $this->wiki->href(),
             'importers' => $importers,
@@ -107,8 +111,8 @@ class AdminImportersAction extends YesWikiAction
             'importersWithoutForm' => $importersWithoutForm,
             'importersWithFieldMapping' => $importersWithFieldMapping,
             'forms' => $formManager->getAll(),
-            'dataSources' => $dataSources,
-            'dataSourcesJson' => json_encode($dataSources, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP),
+            'dataSources' => $editableDataSources,
+            'dataSourcesJson' => json_encode($editableDataSources, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP),
             'message' => $message,
             'syncOutput' => $syncOutput,
             'syncedSourceId' => $syncedSourceId,
@@ -116,12 +120,32 @@ class AdminImportersAction extends YesWikiAction
     }
 
     /**
+     * Turn the stored sources back into what the admin form was filled with, so that editing
+     * then re-saving a source unchanged doesn't alter it (an importer may store its config
+     * differently from how it's typed in, see Importer::normalizeAdminOptions()).
+     */
+    private function editableDataSources(array $dataSources, array $importers): array
+    {
+        $editable = [];
+        foreach ($dataSources as $id => $source) {
+            $className = $importers[$source['importer'] ?? ''] ?? null;
+            $editable[$id] = ($className && is_callable([$className, 'denormalizeAdminOptions']))
+                ? $className::denormalizeAdminOptions($source)
+                : $source;
+        }
+        return $editable;
+    }
+
+    /**
      * Derive a stable id from the source's type and url, so re-saving the same source
-     * (same importer + url) keeps producing the same id instead of a random one.
+     * (same importer + url) keeps producing the same id instead of a random one. Two sources
+     * can share a wiki's url while importing different things from it, hence the remote
+     * form/list they target being part of the id too.
      */
     public function generateId(string $importer, array $sourceOptions): string
     {
         $url = $sourceOptions['url'] ?? $sourceOptions['imap_server_and_folder'] ?? '';
-        return strtolower($importer) . '_' . substr(sha1($importer . '|' . $url), 0, 12);
+        $target = $sourceOptions['remoteFormId'] ?? $sourceOptions['listId'] ?? '';
+        return strtolower($importer) . '_' . substr(sha1($importer . '|' . $url . '|' . $target), 0, 12);
     }
 }

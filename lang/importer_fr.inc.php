@@ -32,17 +32,24 @@ return [
     'IMPORTER_FIELD_AUTH_USER' => 'Utilisateur admin distant',
     'IMPORTER_FIELD_AUTH_PASSWORD' => 'Mot de passe admin distant',
     'IMPORTER_FIELD_REMOTEFORMID' => 'Identifiant du formulaire Bazar distant',
+    'IMPORTER_FIELD_YESWIKITOYESWIKI_URL' => 'Url des fiches du formulaire distant (api json)',
+    'IMPORTER_FIELD_YESWIKITOYESWIKI_URL_HELP' => 'De la forme https://mon-wiki-distant.fr/?api/forms/12/entries/json — '
+        . 'l\'identifiant du formulaire distant en est déduit. Les paramètres ajoutés à cette url '
+        . '(par exemple &query=bf_ville=Marseille) sont conservés, pour n\'importer qu\'une partie des fiches.',
     'IMPORTER_FIELD_LOCALADMINUSER' => 'Nom d\'utilisateur admin local (optionnel, mais requis pour mettre à jour des fiches existantes)',
     'IMPORTER_FIELD_SYNCMODE' => 'Mode de synchronisation',
     'IMPORTER_SYNCMODE_SOURCE_OF_TRUTH' => 'Le wiki distant fait autorité (miroir complet, y compris suppressions)',
     'IMPORTER_SYNCMODE_ALLOW_LOCAL' => 'Synchronisation souple (fiches et modifications locales conservées)',
+    'IMPORTER_FIELD_FILESMODE' => 'Images et fichiers des fiches',
+    'IMPORTER_FILESMODE_DOWNLOAD' => 'Télécharger les images et fichiers sur ce wiki',
+    'IMPORTER_FILESMODE_URL' => 'Garder un lien vers les images et fichiers du wiki distant',
     'IMPORTER_FIELD_TIMEOUTINSEC' => 'Délai maximum des requêtes vers le wiki distant, en secondes (optionnel, 120 par défaut)',
 
     'IMPORTER_FIELD_MAPPING_TITLE' => 'Correspondance des champs',
     'IMPORTER_FIELD_MAPPING_REMOTE' => 'Champ à importer',
     'IMPORTER_FIELD_MAPPING_LOCAL' => 'Champ local correspondant',
     'IMPORTER_FIELD_MAPPING_SKIP' => '— ne pas importer —',
-    'IMPORTER_MAPPING_FETCH_FAILED' => 'Impossible de récupérer les champs du formulaire distant (vérifiez l\'url, l\'identifiant du formulaire distant et les identifiants de connexion).',
+    'IMPORTER_MAPPING_FETCH_FAILED' => 'Impossible de récupérer les champs du formulaire distant (vérifiez l\'url et les identifiants de connexion).',
 
     'EDIT_CONFIG_HINT_SYNC_SECRET' => 'Secret à fournir dans le header "secret" pour déclencher la synchronisation via la route /api/sync (webhook/cron externe)',
 

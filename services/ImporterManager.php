@@ -104,6 +104,9 @@ class ImporterManager
         if (!empty($input['formId'])) {
             $sourceOptions['formId'] = $input['formId'];
         }
+        if ($className && is_callable([$className, 'normalizeAdminOptions'])) {
+            $sourceOptions = $className::normalizeAdminOptions($sourceOptions);
+        }
         return $sourceOptions;
     }
 
@@ -234,30 +237,102 @@ class ImporterManager
         return $response;
     }
 
-    public function downloadFile($sourceUrl, $noSSLCheck = false, $timeoutInSec = 10, $replaceExisting = false)
+    /**
+     * Download $sourceUrl into the wiki's upload directory and return the local file name to
+     * store in an entry's file/image field (empty string on failure).
+     * $destFileName lets the caller keep the source's own file name (e.g. a YesWiki to YesWiki
+     * import, where reusing the remote name keeps the sync idempotent and keeps YesWiki's
+     * "{tag}_{field}_{name}" convention readable); it is always sanitized here, since it comes
+     * from a remote source. Without it, the name is derived from the url as before.
+     */
+    public function downloadFile($sourceUrl, $noSSLCheck = false, $timeoutInSec = 10, $replaceExisting = false, $destFileName = null)
     {
-        $t = explode('/', $sourceUrl);
-        $fileName = array_pop($t);
-        $destFile = sha1($sourceUrl) . '_' . $fileName;
-        $destPath = 'files/' . $destFile;
-        if (!file_exists($destPath) || (file_exists($destPath) && $replaceExisting)) {
-            $fp = fopen($destPath, 'wb');
-            $ch = curl_init($sourceUrl);
-            curl_setopt($ch, CURLOPT_FILE, $fp);
-            curl_setopt($ch, CURLOPT_HEADER, 0);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeoutInSec);
-            curl_setopt($ch, CURLOPT_TIMEOUT, $timeoutInSec);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            if ($noSSLCheck) {
-                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            }
-            curl_exec($ch);
-            $errors = curl_error($ch);
-            if (!empty($errors)) {
-                var_dump($errors);
-            }
-            fclose($fp);
+        if (empty($sourceUrl)) {
+            return '';
         }
+        $urlFileName = rawurldecode(basename(parse_url($sourceUrl, PHP_URL_PATH) ?: $sourceUrl));
+        $destFile = $this->sanitizeDownloadedFileName($destFileName ?? (sha1($sourceUrl) . '_' . $urlFileName));
+        if (empty($destFile)) {
+            echo 'Fichier "' . $sourceUrl . '" non téléchargé : nom ou extension de fichier non autorisé.' . "\n";
+            return '';
+        }
+        $destPath = $this->uploadPath() . '/' . $destFile;
+        if (file_exists($destPath) && !$replaceExisting) {
+            return $destFile;
+        }
+        // download to a temporary file first: a failed request (404 html page, timeout, ssl
+        // error) must not leave a truncated or bogus file behind under the name we are about
+        // to store in the entry, where it would then look like a successful download forever
+        $tmpPath = $destPath . '.part';
+        $fp = fopen($tmpPath, 'wb');
+        if ($fp === false) {
+            echo 'Impossible d\'écrire dans "' . $this->uploadPath() . '".' . "\n";
+            return '';
+        }
+        $ch = curl_init($sourceUrl);
+        curl_setopt($ch, CURLOPT_FILE, $fp);
+        curl_setopt($ch, CURLOPT_HEADER, 0);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeoutInSec);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $timeoutInSec);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        if ($noSSLCheck) {
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        }
+        curl_exec($ch);
+        $errors = curl_error($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        fclose($fp);
+
+        clearstatcache(true, $tmpPath);
+        if (!empty($errors) || ($httpCode >= 400) || filesize($tmpPath) === 0) {
+            unlink($tmpPath);
+            echo 'Téléchargement de "' . $sourceUrl . '" échoué'
+                . (!empty($errors) ? ' : ' . $errors : ($httpCode ? ' (code http ' . $httpCode . ')' : '')) . '.' . "\n";
+            return '';
+        }
+        rename($tmpPath, $destPath);
+        chmod($destPath, 0755);
         return $destFile;
+    }
+
+    private function uploadPath(): string
+    {
+        $attachConfig = $this->params->has('attach_config') ? $this->params->get('attach_config') : [];
+        $path = !empty($attachConfig['upload_path']) ? $attachConfig['upload_path'] : 'files';
+        return rtrim($path, '/');
+    }
+
+    /**
+     * Keep a downloaded file's name usable as a plain file name inside the upload directory:
+     * it comes from a remote source, so it must not escape that directory nor land there with
+     * an extension the wiki would refuse on a regular upload (a server-side executable one
+     * above all). Returns '' when the name can't be made safe.
+     */
+    private function sanitizeDownloadedFileName(string $fileName): string
+    {
+        $fileName = basename(str_replace('\\', '/', $fileName));
+        $fileName = preg_replace('/[^A-Za-z0-9._-]/', '_', $fileName);
+        $fileName = trim($fileName, '.');
+        if ($fileName === '' || strlen($fileName) > 200) {
+            return '';
+        }
+        // YesWiki itself stores some attachments with a trailing "_" on the extension, and
+        // strips it back before checking it: do the same, so ".php_" can't slip through
+        $extension = preg_replace('/_+$/', '', strtolower(pathinfo($fileName, PATHINFO_EXTENSION)));
+        $forbiddenExts = [
+            'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phps', 'phtml', 'phar',
+            'cgi', 'pl', 'py', 'sh', 'bash', 'exe', 'com', 'bat', 'htaccess', 'htpasswd',
+        ];
+        if (in_array($extension, $forbiddenExts, true)) {
+            return '';
+        }
+        // when the wiki declares its authorized extensions (not all YesWiki versions do),
+        // hold downloads to the very same list as a manual upload through a bazar field
+        $authorizedExts = $this->params->has('authorized-extensions') ? $this->params->get('authorized-extensions') : null;
+        if (is_array($authorizedExts) && $extension !== '' && !array_key_exists($extension, $authorizedExts)) {
+            return '';
+        }
+        return $fileName;
     }
 }
