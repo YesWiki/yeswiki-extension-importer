@@ -15,6 +15,16 @@ services:
   YesWiki\Importer\Service\ImporterManager:
     autowire: true
 
+  YesWiki\Importer\Service\SyncScheduler:
+    autowire: true
+
+  # runs the sources flagged "syncOnMaintenance", on the cadence of core's maintenance sweep
+  # (which is itself hardcoded and dispatches nothing an extension could subscribe to)
+  YesWiki\Importer\Service\MaintenanceSyncSubscriber:
+    autowire: true
+    tags:
+      - { name: yeswiki.event_subscriber }
+
   # Allows to use controllers as services
   YesWiki\Importer\Controller\:
     resource: "controllers/*"

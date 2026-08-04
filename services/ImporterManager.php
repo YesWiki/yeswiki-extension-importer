@@ -73,6 +73,41 @@ class ImporterManager
     }
 
     /**
+     * The config fields every importer gets on top of the ones it declares itself, so that a
+     * setting meaningful for any source (when to sync it) doesn't have to be repeated in each
+     * importer's getAdminFields().
+     */
+    public static function commonAdminFields(): array
+    {
+        return [
+            'syncOnMaintenance' => [
+                'type' => 'checkbox',
+                'required' => false,
+                'label' => 'IMPORTER_FIELD_SYNCONMAINTENANCE',
+                'help' => 'IMPORTER_FIELD_SYNCONMAINTENANCE_HELP',
+            ],
+            'syncIntervalInMin' => [
+                'type' => 'number',
+                'required' => false,
+                'label' => 'IMPORTER_FIELD_SYNCINTERVALINMIN',
+                'help' => 'IMPORTER_FIELD_SYNCINTERVALINMIN_HELP',
+            ],
+        ];
+    }
+
+    /**
+     * All the admin fields of $importer: its own, plus the common ones. Single source of truth
+     * for the admin page and the mapping-fields endpoint, which must read the posted input the
+     * very same way.
+     */
+    public function getAdminFieldsFor(string $importer): array
+    {
+        $className = $this->getAvailableImporters()[$importer] ?? null;
+        $ownFields = ($className && is_callable([$className, 'getAdminFields'])) ? $className::getAdminFields() : [];
+        return array_merge($ownFields, self::commonAdminFields());
+    }
+
+    /**
      * Build a dataSources entry for $importer from the generic "{key}{importer}" input fields
      * declared by that importer's getAdminFields(). $input is a plain array keyed the same way
      * whether it comes from $_POST (AdminImportersAction) or a Symfony Request's ParameterBag

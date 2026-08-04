@@ -45,6 +45,17 @@ return [
     'IMPORTER_FILESMODE_URL' => 'Garder un lien vers les images et fichiers du wiki distant',
     'IMPORTER_FIELD_TIMEOUTINSEC' => 'Délai maximum des requêtes vers le wiki distant, en secondes (optionnel, 120 par défaut)',
 
+    'IMPORTER_FIELD_SYNCONMAINTENANCE' => 'Synchroniser automatiquement lors de la maintenance de YesWiki',
+    'IMPORTER_FIELD_SYNCONMAINTENANCE_HELP' => 'Sans cron ni intervention : YesWiki fait son ménage périodique '
+        . '(au plus toutes les 30 minutes, à l\'occasion d\'une visite du wiki), et cette source est alors '
+        . 'synchronisée juste après, une fois la page envoyée au visiteur.',
+    'IMPORTER_FIELD_SYNCINTERVALINMIN' => 'Intervalle minimum entre deux synchronisations automatiques, en minutes (optionnel)',
+    'IMPORTER_FIELD_SYNCINTERVALINMIN_HELP' => 'Laisser vide pour synchroniser à chaque maintenance de YesWiki. '
+        . 'Par exemple 1440 pour ne pas synchroniser cette source plus d\'une fois par jour.',
+    'IMPORTER_LAST_AUTO_SYNC' => 'Dernière synchro auto',
+    'IMPORTER_AUTO_SYNC_NEVER' => 'jamais',
+    'IMPORTER_AUTO_SYNC_DISABLED' => '—',
+
     'IMPORTER_FIELD_MAPPING_TITLE' => 'Correspondance des champs',
     'IMPORTER_FIELD_MAPPING_REMOTE' => 'Champ à importer',
     'IMPORTER_FIELD_MAPPING_LOCAL' => 'Champ local correspondant',

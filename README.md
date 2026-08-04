@@ -182,6 +182,41 @@ Plus d'infos
 ./yeswicli importer:sync -h
 ```
 
+### Automatiquement, sans cron (`syncOnMaintenance`)
+
+Toute source, quel que soit son importer, peut se synchroniser toute seule au
+rythme de la maintenance de YesWiki : cocher « Synchroniser automatiquement
+lors de la maintenance de YesWiki » sur la page d'admin, ou ajouter à la main
+dans `wakka.config.php` :
+
+```php
+ 'dataSources' => [
+        'korben-rss' => [
+            'importer' => 'Rss',
+            // ...
+            'syncOnMaintenance' => true,
+            // 'syncIntervalInMin' => 1440, // optionnel : jamais plus d'une fois par jour
+        ]
+    ],
+```
+
+YesWiki fait son ménage périodique (purge des référents, des vieilles
+révisions de pages, etc.) à l'occasion d'une visite du wiki, sans cron. Les
+sources cochées sont synchronisées au même rythme : au plus une fois toutes
+les 30 minutes, et **après** l'envoi de la page au visiteur (la connexion est
+même refermée avant, en php-fpm), pour que personne n'attende la fin d'un
+import. `syncIntervalInMin` ajoute, si besoin, un intervalle minimum propre à
+la source, pour une source trop lourde pour être importée aussi souvent.
+
+La date de la dernière synchronisation automatique de chaque source est
+affichée sur la page d'admin des importers ; cliquer dessus déplie son
+journal (le même que celui d'une synchro lancée à la main).
+
+Utile de le savoir : rien ne se synchronise sur un wiki que personne ne
+visite, puisque c'est une visite qui déclenche la maintenance. Pour un rythme
+garanti, ou plus rapide que 30 minutes, passer par un cron externe
+(ci-dessous).
+
 ### Depuis un webhook/cron externe
 
 Une route `GET /api/sync` permet de déclencher la synchronisation de toutes
@@ -260,6 +295,11 @@ Sans surcharge, `getAdminFields()` renvoie `[]` et `needsBazarForm()` renvoie
 `true` (valeurs par défaut de la classe abstraite) : l'importer reste
 utilisable en CLI/API, seule la page d'admin n'aura pas de champ dédié pour
 lui (à ajouter à la main dans `wakka.config.php`).
+
+Rien à déclarer en revanche pour la synchronisation automatique : les champs
+`syncOnMaintenance` et `syncIntervalInMin` (voir plus haut) sont ajoutés par
+`ImporterManager::commonAdminFields()` aux champs de tous les importers, quelle
+que soit l'extension qui les fournit.
 
 C'est ce que fait `yeswiki-extension-yunohost` pour ses importers
 `YunohostCLIAppImporter`/`YunohostCLIUserImporter`.

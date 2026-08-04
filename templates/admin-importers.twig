@@ -10,6 +10,7 @@
     <tr>
       <th>{{ _t('IMPORTER_SOURCE_TYPE') }}</th>
       <th>{{ _t('IMPORTER_SOURCE_URL') }}</th>
+      <th>{{ _t('IMPORTER_LAST_AUTO_SYNC') }}</th>
       <th></th>
     </tr>
   </thead>
@@ -18,6 +19,15 @@
     <tr>
       <td>{{ _t('IMPORTER_' ~ (source.importer|default(''))|upper) }}</td>
       <td>{{ source.url|default('') }}</td>
+      <td>
+        {% if not autoSync[id].enabled %}
+        {{ _t('IMPORTER_AUTO_SYNC_DISABLED') }}
+        {% elseif autoSync[id].last is null %}
+        {{ _t('IMPORTER_AUTO_SYNC_NEVER') }}
+        {% else %}
+        <a href="#" class="importer-auto-sync-log" data-id="{{ id }}">{{ autoSync[id].last.time|date('d/m/Y H:i') }}</a>
+        {% endif %}
+      </td>
       <td>
         <form method="POST" action="{{currentUrl}}" style="display:inline">
           <input type="hidden" name="syncSource" value="{{ id }}">
@@ -38,7 +48,12 @@
     </tr>
     {% if syncedSourceId == id %}
     <tr>
-      <td colspan="3"><pre>{{ syncOutput }}</pre></td>
+      <td colspan="4"><pre>{{ syncOutput }}</pre></td>
+    </tr>
+    {% endif %}
+    {% if autoSync[id].enabled and autoSync[id].last is not null %}
+    <tr class="importer-auto-sync-log-row hide" data-id="{{ id }}">
+      <td colspan="4"><pre>{{ autoSync[id].last.output }}</pre></td>
     </tr>
     {% endif %}
     {% endfor %}
@@ -195,6 +210,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
   $('#formId').on('change', function() {
     fetchFieldMapping()
+  })
+
+  // the output of the last automatic sync is rendered folded: it's only of interest when
+  // something looks wrong with a source nobody is watching
+  $('.importer-auto-sync-log').on('click', function(event) {
+    event.preventDefault()
+    $('.importer-auto-sync-log-row[data-id="'+$(this).data('id')+'"]').toggleClass('hide')
   })
 
   $('.importer-edit-btn').on('click', function() {

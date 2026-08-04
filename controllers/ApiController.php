@@ -60,9 +60,7 @@ class ApiController extends YesWikiController
             return new ApiResponse(['fieldMapping' => null]);
         }
 
-        $importerFields = [
-            $importer => is_callable([$className, 'getAdminFields']) ? $className::getAdminFields() : [],
-        ];
+        $importerFields = [$importer => $importerManager->getAdminFieldsFor($importer)];
         $sourceOptions = $importerManager->collectSourceOptionsFromInput($importer, $importerFields, $request->request->all());
 
         $formManager = $this->getService(FormManager::class);

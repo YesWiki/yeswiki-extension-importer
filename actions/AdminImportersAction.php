@@ -8,6 +8,7 @@ use YesWiki\Core\Service\ConfigurationFileProvider;
 use YesWiki\Core\Service\ConfigurationService;
 use YesWiki\Core\YesWikiAction;
 use YesWiki\Importer\Service\ImporterManager;
+use YesWiki\Importer\Service\SyncScheduler;
 
 class AdminImportersAction extends YesWikiAction
 {
@@ -41,8 +42,7 @@ class AdminImportersAction extends YesWikiAction
         // mapping-fields AJAX endpoint (hasRemoteFieldMapping(), e.g. YesWikiToYesWiki)
         $importersWithFieldMapping = [];
         foreach ($importers as $shortName => $className) {
-            $fields = is_callable([$className, 'getAdminFields']) ? $className::getAdminFields() : [];
-            $importerFields[$shortName] = $fields;
+            $importerFields[$shortName] = $importerManager->getAdminFieldsFor($shortName);
             $needsForm = is_callable([$className, 'needsBazarForm']) ? $className::needsBazarForm() : true;
             if (!$needsForm) {
                 $importersWithoutForm[] = $shortName;
@@ -106,6 +106,7 @@ class AdminImportersAction extends YesWikiAction
 
         return $this->render('@importer/admin-importers.twig', [
             'currentUrl' => $this->wiki->href(),
+            'autoSync' => $this->autoSyncStatus($dataSources),
             'importers' => $importers,
             'importerFields' => $importerFields,
             'importersWithoutForm' => $importersWithoutForm,
@@ -117,6 +118,24 @@ class AdminImportersAction extends YesWikiAction
             'syncOutput' => $syncOutput,
             'syncedSourceId' => $syncedSourceId,
         ]);
+    }
+
+    /**
+     * What each source's automatic sync (config 'syncOnMaintenance') has been up to, so that
+     * a sync nobody triggered by hand isn't invisible: an admin needs to see that it ran, when,
+     * and what it did.
+     */
+    private function autoSyncStatus(array $dataSources): array
+    {
+        $scheduler = $this->getService(SyncScheduler::class);
+        $status = [];
+        foreach ($dataSources as $id => $source) {
+            $status[$id] = [
+                'enabled' => !empty($source['syncOnMaintenance']),
+                'last' => $scheduler->getLastAutoSync((string) $id),
+            ];
+        }
+        return $status;
     }
 
     /**
