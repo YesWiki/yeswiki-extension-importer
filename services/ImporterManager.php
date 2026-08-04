@@ -43,9 +43,14 @@ class ImporterManager
 
         $importers = [];
         foreach ($services as $serv) {
-            // service ids are usually class names, but aliases and plain ids can end in
-            // "Importer" too, so work from the last namespace segment instead of assuming
-            // a "…\Service\…" id, and skip the abstract Importer base class itself.
+            // The name alone is not enough: other extensions register their own "…Importer"
+            // services (fulltextsearch's SealImporter / SealBatchImporter, for instance), and
+            // they are not ours to instantiate. Only keep real subclasses of our base Importer.
+            if (!is_subclass_of($serv, Importer::class)) {
+                continue;
+            }
+            // service ids are class names here, but not necessarily under a "…\Service\…"
+            // namespace, so derive the short name from the last segment.
             $parts = explode('\\', $serv);
             $shortClass = substr(end($parts), 0, -strlen('Importer'));
             if ($shortClass === '') {
