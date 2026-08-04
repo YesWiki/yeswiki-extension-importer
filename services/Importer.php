@@ -81,7 +81,10 @@ abstract class Importer
      * Declare the config fields this importer needs, so AdminImportersAction (from this
      * extension) can render/save them for the admin, even when the importer itself lives
      * in another extension.
-     * Each entry: 'key' => ['type' => 'text'|'url'|'password'|'checkbox', 'required' => bool]
+     * Each entry: 'key' => ['type' => 'text'|'url'|'password'|'checkbox'|'select'|'number',
+     * 'required' => bool, 'options' => [value => labelKey] (select only),
+     * 'label' => labelKey (optional, defaults to "IMPORTER_FIELD_{KEY}"),
+     * 'help' => labelKey (optional hint displayed under the field)]
      * A key prefixed "auth_" is stored nested as config['auth'][...] (e.g. "auth_user" -> auth.user).
      * @return array
      */
@@ -115,6 +118,15 @@ abstract class Importer
     }
 
     /**
+     * Whether this importer can offer a field-mapping table built from a remote form fetched
+     * live (ImporterManager::getFieldMapping()), rather than from a fixed getOwnFields() list.
+     */
+    public static function hasRemoteFieldMapping(): bool
+    {
+        return false;
+    }
+
+    /**
      * Normalize a raw admin-posted field value before it's stored in config, e.g. to recover
      * from a common paste mistake (a full API url pasted where only the wiki's base url is
      * expected). Default: no-op. Override for fields whose expected shape can be sanitized.
@@ -124,6 +136,28 @@ abstract class Importer
     public static function normalizeAdminFieldValue(string $key, $value)
     {
         return $value;
+    }
+
+    /**
+     * Normalize the whole set of admin-posted options before it's stored in config, for
+     * importers whose config keys can't be derived one field at a time (e.g. a single pasted
+     * url that carries several config values at once). Applied by
+     * ImporterManager::collectSourceOptionsFromInput(), so both the admin page and the
+     * field-mapping AJAX endpoint see the same normalized options. Default: no-op.
+     */
+    public static function normalizeAdminOptions(array $options): array
+    {
+        return $options;
+    }
+
+    /**
+     * Reverse of normalizeAdminOptions(): rebuild, from the stored config, the values to
+     * prefill the admin form with when editing a source, so that re-saving an unmodified
+     * source is a no-op. Default: no-op.
+     */
+    public static function denormalizeAdminOptions(array $options): array
+    {
+        return $options;
     }
 
     // HELPERS

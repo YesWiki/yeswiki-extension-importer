@@ -65,23 +65,27 @@
   {% for name,fields in importerFields %}
   <div id="form_{{name}}" class="importer-form hide">
     {% for key,field in fields %}
+    {% set fieldLabel = _t(field.label|default('IMPORTER_FIELD_' ~ key|upper)) %}
     <div class="form-group">
       {% if field.type == 'checkbox' %}
       <div class="checkbox">
         <label>
-          <input type="checkbox" name="{{key}}{{name}}" id="{{key}}{{name}}" value="1"> {{ _t('IMPORTER_FIELD_' ~ key|upper) }}
+          <input type="checkbox" name="{{key}}{{name}}" id="{{key}}{{name}}" value="1"> {{ fieldLabel }}
         </label>
       </div>
       {% elseif field.type == 'select' %}
-      <label for="{{key}}{{name}}" class="control-label">{{ _t('IMPORTER_FIELD_' ~ key|upper) }}</label>
+      <label for="{{key}}{{name}}" class="control-label">{{ fieldLabel }}</label>
       <select class="form-control{{ field.required ? ' conditional-required' : '' }}" name="{{key}}{{name}}" id="{{key}}{{name}}">
         {% for optValue,optLabelKey in field.options %}
         <option value="{{optValue}}">{{ _t(optLabelKey) }}</option>
         {% endfor %}
       </select>
       {% else %}
-      <label for="{{key}}{{name}}" class="control-label">{{ _t('IMPORTER_FIELD_' ~ key|upper) }}</label>
-      <input type="{{field.type}}" class="form-control{{ field.required ? ' conditional-required' : '' }}" name="{{key}}{{name}}" id="{{key}}{{name}}" placeholder="{{ _t('IMPORTER_FIELD_' ~ key|upper) }}">
+      <label for="{{key}}{{name}}" class="control-label">{{ fieldLabel }}</label>
+      <input type="{{field.type}}" class="form-control{{ field.required ? ' conditional-required' : '' }}" name="{{key}}{{name}}" id="{{key}}{{name}}" placeholder="{{ fieldLabel }}">
+      {% endif %}
+      {% if field.help is defined %}
+      <span class="help-block">{{ _t(field.help) }}</span>
       {% endif %}
     </div>
     {% endfor %}
@@ -168,10 +172,19 @@ document.addEventListener("DOMContentLoaded", function() {
       return
     }
     const formData = new FormData($('#importer-form')[0])
+    // an importer fetching its fields from a remote form can only answer once its url and
+    // credentials are filled in: stay silent while they aren't, warn once they are
+    const hasUrl = !!$('#url'+importer).val()
     fetch('?api/importer/mapping-fields', { method: 'POST', body: formData })
       .then(function(res) { return res.json() })
       .then(function(data) {
-        renderFieldMapping(data.fieldMapping, preselected)
+        if (data.fieldMapping) {
+          renderFieldMapping(data.fieldMapping, preselected)
+        } else if (hasUrl) {
+          $('#field-mapping-container').append(
+            $('<div>').addClass('alert alert-warning').text('{{ _t('IMPORTER_MAPPING_FETCH_FAILED')|e('js') }}')
+          )
+        }
       })
   }
 
@@ -202,6 +215,9 @@ document.addEventListener("DOMContentLoaded", function() {
         : source[key]
       if (field.type === 'checkbox') {
         input.prop('checked', !!value)
+      } else if (field.type === 'select') {
+        // a source saved before this field existed has no value for it: back to its default
+        input.val(value || input.find('option').first().val())
       } else {
         input.val(value || '')
       }

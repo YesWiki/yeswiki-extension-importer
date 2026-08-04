@@ -24,6 +24,12 @@ use YesWiki\Wiki;
  *   config['fieldsMapping'] once it pre-exists); lists are merged without
  *   ever removing local-only values; entries are created/updated but never
  *   deleted, and are skipped if they were edited locally since our last sync.
+ *
+ * Two file modes (config['filesMode']) for the values of the remote form's file/image fields,
+ * which are file names relative to the remote wiki's upload directory and therefore point at
+ * nothing locally if copied as-is:
+ * - 'download': the files are downloaded into the local upload directory.
+ * - 'url': the local entries keep an absolute url to the file on the source wiki.
  */
 class YesWikiToYesWikiImporter extends Importer
 {
@@ -32,6 +38,7 @@ class YesWikiToYesWikiImporter extends Importer
     protected $remoteForm;
     protected $localFormExists;
     protected $listTagPairs = [];
+    protected $fileFieldKeys = [];
     protected $impersonationPreviousUser;
 
     public function __construct(
@@ -64,10 +71,20 @@ class YesWikiToYesWikiImporter extends Importer
     public function checkConfig(array $config)
     {
         $config = parent::checkConfig($config);
-        foreach (['url', 'remoteFormId', 'formId', 'syncMode'] as $key) {
+        // "url" is the remote form's entries API url, which already carries the remote form id
+        // (and, optionally, the query parameters restricting which entries to import)
+        $parsedUrl = !empty($config['url']) ? self::parseEntriesUrl($config['url']) : null;
+        if (!empty($parsedUrl)) {
+            $config = array_merge($config, $parsedUrl);
+        }
+        foreach (['url', 'formId', 'syncMode'] as $key) {
             if (empty($config[$key])) {
                 exit('Le paramètre "' . $key . '" est requis pour un importer YesWikiToYesWiki.' . "\n");
             }
+        }
+        if (empty($config['remoteFormId'])) {
+            exit('Le paramètre "url" doit être l\'url de l\'api des fiches du formulaire distant, ' .
+                'de la forme "https://mon-wiki-distant.fr/?api/forms/12/entries/json".' . "\n");
         }
         if (empty($config['auth']['user']) || empty($config['auth']['password'])) {
             exit('Les paramètres "auth.user" et "auth.password" sont requis pour un importer YesWikiToYesWiki.' . "\n");
@@ -75,16 +92,24 @@ class YesWikiToYesWikiImporter extends Importer
         if (!in_array($config['syncMode'], ['source_of_truth', 'allow_local'], true)) {
             exit('Le paramètre "syncMode" doit valoir "source_of_truth" ou "allow_local".' . "\n");
         }
+        $config['filesMode'] = $config['filesMode'] ?? 'download';
+        if (!in_array($config['filesMode'], ['download', 'url'], true)) {
+            exit('Le paramètre "filesMode" doit valoir "download" ou "url".' . "\n");
+        }
         return $config;
     }
 
     public static function getAdminFields(): array
     {
         return [
-            'url' => ['type' => 'url', 'required' => true],
+            'url' => [
+                'type' => 'url',
+                'required' => true,
+                'label' => 'IMPORTER_FIELD_YESWIKITOYESWIKI_URL',
+                'help' => 'IMPORTER_FIELD_YESWIKITOYESWIKI_URL_HELP',
+            ],
             'auth_user' => ['type' => 'text', 'required' => true],
             'auth_password' => ['type' => 'password', 'required' => true],
-            'remoteFormId' => ['type' => 'text', 'required' => true],
             'localAdminUser' => ['type' => 'text', 'required' => false],
             'syncMode' => [
                 'type' => 'select',
@@ -94,31 +119,101 @@ class YesWikiToYesWikiImporter extends Importer
                     'allow_local' => 'IMPORTER_SYNCMODE_ALLOW_LOCAL',
                 ],
             ],
+            'filesMode' => [
+                'type' => 'select',
+                'required' => true,
+                'options' => [
+                    'download' => 'IMPORTER_FILESMODE_DOWNLOAD',
+                    'url' => 'IMPORTER_FILESMODE_URL',
+                ],
+            ],
             'noSSLCheck' => ['type' => 'checkbox', 'required' => false],
             'timeoutInSec' => ['type' => 'number', 'required' => false],
         ];
     }
 
-    /**
-     * "url" must be the remote wiki's base url (which may include a subfolder, for wikis not
-     * installed at their domain's root): remoteUrl() appends its own "/?api/..." path to it. A
-     * common mistake is pasting a full API url (e.g. copied from a browser tab while testing)
-     * instead, whose "?api/..." query string then silently produces a broken url every request
-     * is built from (rtrim() only strips a trailing "/", it won't remove a query already there).
-     * Drop only the query/fragment, keeping scheme+host(+port)+path intact, so that mistake
-     * self-corrects on save without breaking subfolder installs.
-     */
-    public static function normalizeAdminFieldValue(string $key, $value)
+    public static function hasRemoteFieldMapping(): bool
     {
-        if ($key === 'url' && is_string($value) && $value !== '') {
-            $parts = parse_url($value);
-            if (!empty($parts['scheme']) && !empty($parts['host'])) {
-                $value = $parts['scheme'] . '://' . $parts['host']
-                    . (!empty($parts['port']) ? ':' . $parts['port'] : '')
-                    . ($parts['path'] ?? '');
+        return true;
+    }
+
+    /**
+     * The admin pastes a single url, the remote form's entries API url (as displayed by the
+     * remote wiki itself, e.g. https://mon-wiki.fr/?api/forms/12/entries/json), so there is no
+     * separate remote form id to ask for. Split it into what the importer actually works with:
+     * the remote wiki's base url (which every other api call is built from), the remote form
+     * id, and the extra query parameters, if any, to forward when fetching the entries
+     * (&query=... to import only a subset of the remote form's entries).
+     */
+    public static function normalizeAdminOptions(array $options): array
+    {
+        $parsed = !empty($options['url']) ? self::parseEntriesUrl($options['url']) : null;
+        if (empty($parsed)) {
+            // leave the url as typed: checkConfig() reports what's expected at sync time
+            return $options;
+        }
+        if (empty($parsed['entriesQuery'])) {
+            unset($parsed['entriesQuery'], $options['entriesQuery']);
+        }
+        return array_merge($options, $parsed);
+    }
+
+    /**
+     * Rebuild the entries API url the admin pasted, to prefill the edit form with.
+     */
+    public static function denormalizeAdminOptions(array $options): array
+    {
+        if (empty($options['url']) || empty($options['remoteFormId'])) {
+            return $options;
+        }
+        $options['url'] = rtrim($options['url'], '/') . '/?api/forms/' . $options['remoteFormId'] . '/entries/json'
+            . (empty($options['entriesQuery']) ? '' : '&' . $options['entriesQuery']);
+        return $options;
+    }
+
+    /**
+     * Extract ['url' => remote wiki base url, 'remoteFormId' => ..., 'entriesQuery' => ...]
+     * from a remote form's entries API url, or null if that's not what was given.
+     * All the url shapes a YesWiki can produce are accepted: the usual "?api/..." shortcut,
+     * its "?wiki=api/..." long form, and the rewritten "/api/..." path, each possibly under a
+     * subfolder (for wikis not installed at their domain's root).
+     */
+    public static function parseEntriesUrl(string $url): ?array
+    {
+        $parts = parse_url(trim($url));
+        if (empty($parts) || empty($parts['host'])) {
+            return null;
+        }
+        $path = $parts['path'] ?? '/';
+        $handler = '';
+        $extraParams = [];
+        foreach (array_filter(explode('&', $parts['query'] ?? '')) as $param) {
+            if ($handler === '' && (strpos($param, 'api/') === 0 || strpos($param, 'wiki=api/') === 0)) {
+                $handler = preg_replace('~^wiki=~', '', $param);
+            } else {
+                $extraParams[] = $param;
             }
         }
-        return $value;
+        $handlerIsPath = ($handler === '');
+        if ($handlerIsPath) {
+            $handler = $path;
+        }
+        if (!preg_match('~(?:^|/)api/forms/([^/?&]+)/entries~', rawurldecode($handler), $matches)) {
+            return null;
+        }
+        $basePath = $path;
+        if ($handlerIsPath) {
+            $apiPos = strpos($path, 'api/forms');
+            $basePath = $apiPos === false ? '' : substr($path, 0, $apiPos);
+        }
+        // "https://mon-wiki.fr/index.php?api/..." : the entry script is not part of the base url
+        $basePath = preg_replace('~/[^/]*\.php$~', '', rtrim($basePath, '/'));
+        return [
+            'url' => ($parts['scheme'] ?? 'https') . '://' . $parts['host']
+                . (!empty($parts['port']) ? ':' . $parts['port'] : '') . $basePath,
+            'remoteFormId' => $matches[1],
+            'entriesQuery' => implode('&', $extraParams),
+        ];
     }
 
     public function authenticate()
@@ -143,8 +238,12 @@ class YesWikiToYesWikiImporter extends Importer
     public function getData()
     {
         $this->authenticate();
+        $entriesPath = 'api/forms/' . $this->config['remoteFormId'] . '/entries';
+        if (!empty($this->config['entriesQuery'])) {
+            $entriesPath .= '&' . $this->config['entriesQuery'];
+        }
         $form = $this->remoteGet('api/forms/' . $this->config['remoteFormId']);
-        $entries = $this->remoteGet('api/forms/' . $this->config['remoteFormId'] . '/entries');
+        $entries = $this->remoteGet($entriesPath);
         return [
             'form' => is_array($form) ? $form : [],
             'entries' => is_array($entries) ? $entries : [],
@@ -199,6 +298,16 @@ class YesWikiToYesWikiImporter extends Importer
                         $this->listTagPairs[$remoteTag . '|' . $localTag] = [$remoteTag, $localTag];
                     }
                 }
+            }
+        }
+
+        // file/image fields hold a file name relative to the remote wiki's upload directory:
+        // remember where they land locally, syncData() turns them into something the local
+        // wiki can actually serve (a downloaded file, or an url to the source wiki)
+        $this->fileFieldKeys = [];
+        foreach ($mapping as $remoteField => $localField) {
+            if ($this->isFileBackedField($remoteFieldsByProperty[$remoteField] ?? null)) {
+                $this->fileFieldKeys[] = $localField;
             }
         }
 
@@ -276,7 +385,7 @@ class YesWikiToYesWikiImporter extends Importer
                 }
 
                 if (empty($localId)) {
-                    $created = $this->entryManager->create($this->config['formId'], $mappedEntry, false, $remoteUrl);
+                    $created = $this->entryManager->create($this->config['formId'], $this->importEntryFiles($mappedEntry), false, $remoteUrl);
                     if (!empty($created['id_fiche'])) {
                         $seenLocalIds[] = $created['id_fiche'];
                         $this->markSynced($created['id_fiche'], date('Y-m-d H:i:s'));
@@ -291,7 +400,7 @@ class YesWikiToYesWikiImporter extends Importer
                     if ($remoteDateMajFiche) {
                         $mappedEntry['date_maj_fiche'] = $remoteDateMajFiche;
                     }
-                    $this->entryManager->update($localId, $mappedEntry, false, true);
+                    $this->entryManager->update($localId, $this->importEntryFiles($mappedEntry), false, true);
                     echo 'Entrée "' . $title . '" mise à jour (miroir).' . "\n";
                     continue;
                 }
@@ -304,7 +413,7 @@ class YesWikiToYesWikiImporter extends Importer
                     echo 'Entrée "' . $title . '" modifiée localement, non synchronisée.' . "\n";
                     continue;
                 }
-                $this->entryManager->update($localId, $mappedEntry, false, true);
+                $this->entryManager->update($localId, $this->importEntryFiles($mappedEntry), false, true);
                 $this->markSynced($localId, date('Y-m-d H:i:s'));
                 echo 'Entrée "' . $title . '" mise à jour.' . "\n";
             } catch (\Throwable $ex) {
@@ -364,6 +473,72 @@ class YesWikiToYesWikiImporter extends Importer
     private function isListBackedField($field): bool
     {
         return $field instanceof EnumField && !$field->isEnumEntryField();
+    }
+
+    /**
+     * True for a field whose value is an attached file name (image, fichier, and any field
+     * deriving from them). Matched on the short class name rather than with instanceof: the
+     * bazar fields' namespace changed between YesWiki versions (Bazar\Field, Core\Field,
+     * Content\Field...) while their class names did not.
+     */
+    private function isFileBackedField($field): bool
+    {
+        for ($class = is_object($field) ? get_class($field) : ''; !empty($class); $class = get_parent_class($class)) {
+            $shortName = substr(strrchr('\\' . $class, '\\'), 1);
+            if (in_array($shortName, ['FileField', 'ImageField'], true)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function filesMode(): string
+    {
+        return $this->config['filesMode'] ?? 'download';
+    }
+
+    /**
+     * Replace, in an entry about to be written locally, each remote file name by something the
+     * local wiki can serve: either the name of a copy downloaded into the local upload
+     * directory, or an absolute url to the file left on the source wiki (which the file/image
+     * fields of recent YesWiki versions accept as a value).
+     */
+    private function importEntryFiles(array $mappedEntry): array
+    {
+        foreach ($this->fileFieldKeys as $key) {
+            $value = $mappedEntry[$key] ?? null;
+            // an already absolute url is a file the remote entry itself did not host: keep it
+            if (empty($value) || !is_string($value) || filter_var($value, FILTER_VALIDATE_URL) !== false) {
+                continue;
+            }
+            $remoteFileUrl = $this->remoteFileUrl($value);
+            if ($this->filesMode() === 'url') {
+                $mappedEntry[$key] = $remoteFileUrl;
+                continue;
+            }
+            $localFileName = $this->importerManager->downloadFile(
+                $remoteFileUrl,
+                $this->noSSLCheck(),
+                $this->timeoutInSec(),
+                false,
+                $value
+            );
+            // an entry pointing at a file that isn't there is worse than one without a file:
+            // the field would be emptied on the next local edit anyway
+            $mappedEntry[$key] = $localFileName;
+        }
+        return $mappedEntry;
+    }
+
+    /**
+     * Url of a file attached to a remote entry. The remote upload directory is "files" unless
+     * that wiki changed its attach_config['upload_path'], which no api exposes: config
+     * 'remoteFilesPath' is there for that (rare) case.
+     */
+    private function remoteFileUrl(string $fileName): string
+    {
+        $remotePath = trim($this->config['remoteFilesPath'] ?? 'files', '/');
+        return rtrim($this->config['url'], '/') . '/' . $remotePath . '/' . rawurlencode($fileName);
     }
 
     private function fetchRemotePage(string $tag): ?array
