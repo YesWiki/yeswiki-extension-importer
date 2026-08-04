@@ -145,6 +145,12 @@ reposent pas sur des champs cachés ajoutés au formulaire : elles utilisent le
 triple `source_url` existant (même mécanisme que les autres importers de
 cette extension) et un triple dédié pour la date de dernière synchro.
 
+Une fiche locale n'est réécrite que si au moins un des champs synchronisés
+diffère réellement de ce qui est déjà enregistré : les synchros répétées ne
+créent donc pas de révision ni de changement de `date_maj_fiche` inutiles, et
+le journal liste, pour chaque fiche mise à jour, les champs qui ont changé
+(les fiches identiques sont juste comptées en fin de synchro).
+
 **`localAdminUser`** : `EntryManager::update()` vérifie toujours les ACL en
 écriture de la fiche visée par rapport à l'utilisateur·ice actuellement
 connecté·e (contrairement à la création, qui les ignore) ; or une synchro

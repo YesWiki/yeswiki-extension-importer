@@ -363,6 +363,7 @@ class YesWikiToYesWikiImporter extends Importer
         }
 
         $seenLocalIds = [];
+        $unchangedCount = 0;
         foreach ($data as $mappedEntry) {
             $remoteUrl = $mappedEntry['_remote_url'];
             $remoteDateMajFiche = $mappedEntry['_remote_date_maj_fiche'] ?? null;
@@ -373,7 +374,8 @@ class YesWikiToYesWikiImporter extends Importer
 
             try {
                 $localId = $this->findLocalEntryByRemoteUrl($remoteUrl);
-                if (!empty($localId) && empty($this->entryManager->getOne($localId))) {
+                $localEntry = empty($localId) ? null : $this->entryManager->getOne($localId);
+                if (!empty($localId) && empty($localEntry)) {
                     // stale mapping: the tripleStore still links this remote url to a local
                     // entry that no longer exists (deleted outside this sync, or left over
                     // from an earlier run) - clear it and treat it as "not found" instead of
@@ -397,29 +399,44 @@ class YesWikiToYesWikiImporter extends Importer
                 $seenLocalIds[] = $localId;
 
                 if ($isSourceOfTruth) {
-                    if ($remoteDateMajFiche) {
-                        $mappedEntry['date_maj_fiche'] = $remoteDateMajFiche;
+                    $newValues = $this->importEntryFiles($mappedEntry);
+                    $changed = $this->changedFields($localEntry, $newValues);
+                    if (empty($changed)) {
+                        $unchangedCount++;
+                        continue;
                     }
-                    $this->entryManager->update($localId, $this->importEntryFiles($mappedEntry), false, true);
-                    echo 'Entrée "' . $title . '" mise à jour (miroir).' . "\n";
+                    if ($remoteDateMajFiche) {
+                        $newValues['date_maj_fiche'] = $remoteDateMajFiche;
+                    }
+                    $this->entryManager->update($localId, $newValues, false, true);
+                    echo 'Entrée "' . $title . '" mise à jour (miroir) : ' . implode(', ', $changed) . '.' . "\n";
                     continue;
                 }
 
                 // allow_local: skip if a human edited the entry locally since our last write
                 $lastSync = $this->getLastSyncTime($localId);
-                $localEntry = $this->entryManager->getOne($localId);
                 $localDateMajFiche = $localEntry['date_maj_fiche'] ?? null;
                 if ($lastSync !== null && $localDateMajFiche !== null && $localDateMajFiche > $lastSync) {
                     echo 'Entrée "' . $title . '" modifiée localement, non synchronisée.' . "\n";
                     continue;
                 }
-                $this->entryManager->update($localId, $this->importEntryFiles($mappedEntry), false, true);
+                $newValues = $this->importEntryFiles($mappedEntry);
+                $changed = $this->changedFields($localEntry, $newValues);
+                if (empty($changed)) {
+                    $unchangedCount++;
+                    continue;
+                }
+                $this->entryManager->update($localId, $newValues, false, true);
                 $this->markSynced($localId, date('Y-m-d H:i:s'));
-                echo 'Entrée "' . $title . '" mise à jour.' . "\n";
+                echo 'Entrée "' . $title . '" mise à jour : ' . implode(', ', $changed) . '.' . "\n";
             } catch (\Throwable $ex) {
                 // one invalid/incompatible remote entry must not abort the whole sync batch
                 echo 'Erreur sur l\'entrée "' . $title . '" : ' . $ex->getMessage() . "\n";
             }
+        }
+
+        if ($unchangedCount > 0) {
+            echo $unchangedCount . ' entrée(s) déjà à jour, non réécrite(s).' . "\n";
         }
 
         if ($isSourceOfTruth) {
@@ -633,6 +650,56 @@ class YesWikiToYesWikiImporter extends Importer
             $this->listManager->create($title, $mergedNodes, $localTag);
         }
         echo 'Liste "' . $localTag . '" fusionnée (total local : ' . count($mergedNodes) . ' valeur(s)).' . "\n";
+    }
+
+    /**
+     * The fields writing $newValues would actually change in the local entry (empty: nothing
+     * to do). A remote entry that didn't move must not be rewritten: EntryManager::update()
+     * unconditionally saves a new page revision and stamps date_maj_fiche with the current
+     * time, so an unconditional update makes every sync report changes that never happened,
+     * grows the pages table by one revision per entry per run, and (in allow_local) keeps
+     * moving the local "last modified" date the local-edit detection relies on.
+     * Only the keys we are about to write are compared: fields the local form has but the
+     * mapping doesn't cover are none of our business.
+     */
+    private function changedFields(?array $localEntry, array $newValues): array
+    {
+        if (empty($localEntry)) {
+            return array_keys($newValues);
+        }
+        $changed = [];
+        foreach ($newValues as $key => $value) {
+            // bazar bookkeeping, not content: 'antispam' is only there to pass validate(),
+            // and date_maj_fiche is precisely what an update would (re)write
+            if (in_array($key, ['antispam', 'date_maj_fiche'], true)) {
+                continue;
+            }
+            if ($this->comparableValue($value) !== $this->comparableValue($localEntry[$key] ?? null)) {
+                $changed[] = $key;
+            }
+        }
+        return $changed;
+    }
+
+    /**
+     * A field's value as a string that can be compared between what the remote api returned
+     * (json: nulls, numbers, and multi-valued fields possibly as arrays) and what bazar stored
+     * locally (always strings, multi-valued fields comma separated).
+     */
+    private function comparableValue($value): string
+    {
+        if (is_array($value)) {
+            $value = implode(',', array_map(function ($item) {
+                return is_scalar($item) ? (string) $item : json_encode($item);
+            }, array_values($value)));
+        } elseif (is_bool($value)) {
+            $value = $value ? '1' : '';
+        } elseif ($value === null) {
+            $value = '';
+        } elseif (!is_scalar($value)) {
+            $value = json_encode($value);
+        }
+        return trim((string) $value);
     }
 
     private function findLocalEntryByRemoteUrl(string $remoteUrl): ?string
