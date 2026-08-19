@@ -307,8 +307,11 @@ class ImporterManager
      * import, where reusing the remote name keeps the sync idempotent and keeps YesWiki's
      * "{tag}_{field}_{name}" convention readable); it is always sanitized here, since it comes
      * from a remote source. Without it, the name is derived from the url as before.
+     * $headers carries whatever the source needs to serve the file, a session cookie above
+     * all: a wiki that keeps its upload directory behind a login answers 403 to an anonymous
+     * request, and the entry then points at a file that was never downloaded.
      */
-    public function downloadFile($sourceUrl, $noSSLCheck = false, $timeoutInSec = 30, $replaceExisting = false, $destFileName = null)
+    public function downloadFile($sourceUrl, $noSSLCheck = false, $timeoutInSec = 30, $replaceExisting = false, $destFileName = null, array $headers = [])
     {
         if (empty($sourceUrl)) {
             return '';
@@ -335,6 +338,9 @@ class ImporterManager
         $ch = curl_init($sourceUrl);
         curl_setopt($ch, CURLOPT_FILE, $fp);
         curl_setopt($ch, CURLOPT_HEADER, 0);
+        if (!empty($headers)) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        }
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeoutInSec);
         curl_setopt($ch, CURLOPT_TIMEOUT, $timeoutInSec);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);

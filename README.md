@@ -128,12 +128,24 @@ sous-dossier de fichiers par page), utiliser le mode `url`.
             'localAdminUser' => 'admin', // voir note ACL ci-dessous
             'syncMode' => 'source_of_truth', // ou 'allow_local'
             'filesMode' => 'download', // ou 'url'
+            // 'keepRemoteUpdateDate' => false, // voir « Dates des fiches » ci-dessous
             // 'fieldsMapping' => ['bf_titre_distant' => 'bf_titre_local', ...], // requis en allow_local si formId existe déjà
             // 'noSSLCheck' => false,
             // 'remoteFilesPath' => 'files', // si le wiki distant n'utilise pas "files/"
         ]
     ],
 ```
+
+#### Dates des fiches
+
+La date de création d'une fiche importée est toujours celle qu'elle a sur le
+wiki source. Sans cela une fiche importée prétend avoir été créée le jour de
+l'import, ce qui se voit dès qu'une liste trie ou filtre par date de création.
+
+La date de modification n'est reprise que si `keepRemoteUpdateDate` est
+activé. Elle ne sert pas qu'à l'affichage : en mode `allow_local`, c'est elle
+qui distingue une fiche modifiée ici d'une fiche écrite par l'import. Ne
+l'activer que si les fiches importées ne sont pas modifiées localement.
 
 L'url est découpée à la lecture de la configuration en `url` (url de base du
 wiki distant), `remoteFormId` et `entriesQuery` : une configuration écrite à

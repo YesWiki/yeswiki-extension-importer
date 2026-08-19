@@ -48,6 +48,11 @@ return [
     'IMPORTER_FIELD_FILESMODE' => 'Images et fichiers des fiches',
     'IMPORTER_FILESMODE_DOWNLOAD' => 'Télécharger les images et fichiers sur ce wiki',
     'IMPORTER_FILESMODE_URL' => 'Garder un lien vers les images et fichiers du wiki distant',
+    'IMPORTER_FIELD_KEEPREMOTEUPDATEDATE' => 'Conserver aussi la date de modification des fiches distantes',
+    'IMPORTER_FIELD_KEEPREMOTEUPDATEDATE_HELP' => 'La date de création est toujours reprise du wiki source. '
+        . 'La date de modification, elle, sert aussi à repérer les fiches modifiées ici depuis la dernière '
+        . 'synchronisation (mode "synchronisation souple") : ne la reprendre que si les fiches importées ne '
+        . 'sont pas modifiées localement.',
     'IMPORTER_FIELD_TIMEOUTINSEC' => 'Délai maximum des requêtes vers le wiki distant, en secondes (optionnel, 120 par défaut)',
 
     'IMPORTER_FIELD_SYNCONMAINTENANCE' => 'Synchroniser automatiquement lors de la maintenance de YesWiki',

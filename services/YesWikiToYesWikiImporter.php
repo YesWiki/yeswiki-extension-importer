@@ -127,6 +127,11 @@ class YesWikiToYesWikiImporter extends Importer
                     'url' => 'IMPORTER_FILESMODE_URL',
                 ],
             ],
+            'keepRemoteUpdateDate' => [
+                'type' => 'checkbox',
+                'required' => false,
+                'help' => 'IMPORTER_FIELD_KEEPREMOTEUPDATEDATE_HELP',
+            ],
             'noSSLCheck' => ['type' => 'checkbox', 'required' => false],
             'timeoutInSec' => ['type' => 'number', 'required' => false],
         ];
@@ -310,6 +315,11 @@ class YesWikiToYesWikiImporter extends Importer
                 $this->fileFieldKeys[] = $localField;
             }
         }
+        // an image that silently doesn't arrive is the hardest kind of import bug to see from
+        // the outside, so say which fields are being treated as files and how
+        echo empty($this->fileFieldKeys)
+            ? 'Aucun champ fichier/image dans la correspondance : les fichiers ne seront pas importés.' . "\n"
+            : 'Champs fichier/image (' . $this->filesMode() . ') : ' . implode(', ', $this->fileFieldKeys) . "\n";
 
         $mappedEntries = [];
         foreach ($remoteEntries as $remoteEntry) {
@@ -323,7 +333,9 @@ class YesWikiToYesWikiImporter extends Importer
                 }
             }
             $mappedEntry['_remote_url'] = $remoteEntry['url'];
-            $mappedEntry['_remote_date_maj_fiche'] = $remoteEntry['date_maj_fiche'] ?? null;
+            // the remote wiki names these after its own core generation, so read both
+            $mappedEntry['_remote_created'] = $remoteEntry['date_creation_fiche'] ?? $remoteEntry['created_at'] ?? null;
+            $mappedEntry['_remote_updated'] = $remoteEntry['date_maj_fiche'] ?? $remoteEntry['updated_at'] ?? null;
             $mappedEntries[] = $mappedEntry;
         }
         return $mappedEntries;
@@ -366,8 +378,9 @@ class YesWikiToYesWikiImporter extends Importer
         $unchangedCount = 0;
         foreach ($data as $mappedEntry) {
             $remoteUrl = $mappedEntry['_remote_url'];
-            $remoteDateMajFiche = $mappedEntry['_remote_date_maj_fiche'] ?? null;
-            unset($mappedEntry['_remote_url'], $mappedEntry['_remote_date_maj_fiche']);
+            $remoteCreatedAt = $mappedEntry['_remote_created'] ?? null;
+            $remoteUpdatedAt = $mappedEntry['_remote_updated'] ?? null;
+            unset($mappedEntry['_remote_url'], $mappedEntry['_remote_created'], $mappedEntry['_remote_updated']);
             $title = $mappedEntry['bf_titre'] ?? $remoteUrl;
             // required by EntryManager::validate() on both create() and update()
             $mappedEntry['antispam'] = 1;
@@ -387,7 +400,8 @@ class YesWikiToYesWikiImporter extends Importer
                 }
 
                 if (empty($localId)) {
-                    $created = $this->entryManager->create($this->config['formId'], $this->importEntryFiles($mappedEntry), false, $remoteUrl);
+                    $newValues = $this->withRemoteDates($this->importEntryFiles($mappedEntry), $remoteCreatedAt, $remoteUpdatedAt);
+                    $created = $this->entryManager->create($this->config['formId'], $newValues, false, $remoteUrl);
                     if (!empty($created['id_fiche'])) {
                         $seenLocalIds[] = $created['id_fiche'];
                         $this->markSynced($created['id_fiche'], date('Y-m-d H:i:s'));
@@ -399,14 +413,11 @@ class YesWikiToYesWikiImporter extends Importer
                 $seenLocalIds[] = $localId;
 
                 if ($isSourceOfTruth) {
-                    $newValues = $this->importEntryFiles($mappedEntry);
+                    $newValues = $this->withRemoteDates($this->importEntryFiles($mappedEntry), $remoteCreatedAt, $remoteUpdatedAt);
                     $changed = $this->changedFields($localEntry, $newValues);
                     if (empty($changed)) {
                         $unchangedCount++;
                         continue;
-                    }
-                    if ($remoteDateMajFiche) {
-                        $newValues['date_maj_fiche'] = $remoteDateMajFiche;
                     }
                     $this->entryManager->update($localId, $newValues, false, true);
                     echo 'Entrée "' . $title . '" mise à jour (miroir) : ' . implode(', ', $changed) . '.' . "\n";
@@ -420,7 +431,7 @@ class YesWikiToYesWikiImporter extends Importer
                     echo 'Entrée "' . $title . '" modifiée localement, non synchronisée.' . "\n";
                     continue;
                 }
-                $newValues = $this->importEntryFiles($mappedEntry);
+                $newValues = $this->withRemoteDates($this->importEntryFiles($mappedEntry), $remoteCreatedAt, $remoteUpdatedAt);
                 $changed = $this->changedFields($localEntry, $newValues);
                 if (empty($changed)) {
                     $unchangedCount++;
@@ -509,6 +520,42 @@ class YesWikiToYesWikiImporter extends Importer
         return false;
     }
 
+    /**
+     * The entry keys holding the creation and modification dates on the running core. Ticket
+     * 27 renamed them: a core that predates it ignores the new names, a core that has them
+     * stores the old ones as stray body keys, so write whichever pair this one actually reads.
+     * @return array [createdKey, updatedKey]
+     */
+    private function dateKeys(): array
+    {
+        return defined(get_class($this->entryManager) . '::LEGACY_ENTRY_KEYS')
+            ? ['created_at', 'updated_at']
+            : ['date_creation_fiche', 'date_maj_fiche'];
+    }
+
+    /**
+     * Stamp an entry about to be written with the dates it carries on the source wiki.
+     *
+     * The creation date is always the remote one. An imported entry that claims to have been
+     * created the day the import ran is simply wrong, and it shows the moment anything sorts
+     * or filters by creation date, which is most of what a bazar list does.
+     *
+     * The modification date is only copied when the source asks for it
+     * ('keepRemoteUpdateDate'), because it is not only a date: in 'allow_local' mode it is
+     * also what tells an entry a human edited here from one this importer last wrote.
+     */
+    private function withRemoteDates(array $values, ?string $createdAt, ?string $updatedAt): array
+    {
+        [$createdKey, $updatedKey] = $this->dateKeys();
+        if (!empty($createdAt)) {
+            $values[$createdKey] = $createdAt;
+        }
+        if (!empty($updatedAt) && !empty($this->config['keepRemoteUpdateDate'])) {
+            $values[$updatedKey] = $updatedAt;
+        }
+        return $values;
+    }
+
     private function filesMode(): string
     {
         return $this->config['filesMode'] ?? 'download';
@@ -538,7 +585,10 @@ class YesWikiToYesWikiImporter extends Importer
                 $this->noSSLCheck(),
                 $this->timeoutInSec(),
                 false,
-                $value
+                $value,
+                // same session as every other call to this wiki: a source that keeps its
+                // upload directory behind a login serves nothing to an anonymous request
+                empty($this->cookie) ? [] : ['Cookie: ' . $this->cookie]
             );
             // an entry pointing at a file that isn't there is worse than one without a file:
             // the field would be emptied on the next local edit anyway
@@ -668,10 +718,11 @@ class YesWikiToYesWikiImporter extends Importer
             return array_keys($newValues);
         }
         $changed = [];
+        $updatedKey = $this->dateKeys()[1];
         foreach ($newValues as $key => $value) {
             // bazar bookkeeping, not content: 'antispam' is only there to pass validate(),
-            // and date_maj_fiche is precisely what an update would (re)write
-            if (in_array($key, ['antispam', 'date_maj_fiche'], true)) {
+            // and the modification date is precisely what an update would (re)write
+            if (in_array($key, ['antispam', $updatedKey], true)) {
                 continue;
             }
             if ($this->comparableValue($value) !== $this->comparableValue($localEntry[$key] ?? null)) {
