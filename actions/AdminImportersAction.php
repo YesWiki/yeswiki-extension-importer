@@ -31,10 +31,12 @@ class AdminImportersAction extends YesWikiAction
             ]);
         }
 
-        ImportTimeline::mark('action: config file checked');
+        ImportTimeline::mark('action: admin check + is_writable done');
         $importerManager = $this->getService(ImporterManager::class);
-        $importers = $importerManager->getAvailableImporters();
-        ImportTimeline::mark('action: getAvailableImporters (' . count($importers) . ' importers)');
+        $importers = ImportTimeline::around('getAvailableImporters', function () use ($importerManager) {
+            return $importerManager->getAvailableImporters();
+        });
+        ImportTimeline::mark('action: importers = ' . implode(', ', array_keys($importers)));
         $formManager = $this->getService(FormManager::class);
         // each importer class (from this extension or any other) declares its own admin
         // fields via Importer::getAdminFields()/needsBazarForm(), so this action stays
@@ -46,6 +48,7 @@ class AdminImportersAction extends YesWikiAction
         // mapping-fields AJAX endpoint (hasRemoteFieldMapping(), e.g. YesWikiToYesWiki)
         $importersWithFieldMapping = [];
         foreach ($importers as $shortName => $className) {
+            ImportTimeline::mark('action: admin fields of ' . $shortName . ' (' . $className . ')');
             $importerFields[$shortName] = $importerManager->getAdminFieldsFor($shortName);
             $needsForm = is_callable([$className, 'needsBazarForm']) ? $className::needsBazarForm() : true;
             if (!$needsForm) {
@@ -59,9 +62,11 @@ class AdminImportersAction extends YesWikiAction
         }
 
         ImportTimeline::mark('action: admin fields collected');
-        $config = $this->getService(ConfigurationService::class)->getConfiguration($configFile);
-        $config->load();
-        ImportTimeline::mark('action: wakka.config.php loaded');
+        $config = ImportTimeline::around('load wakka.config.php', function () use ($configFile) {
+            $config = $this->getService(ConfigurationService::class)->getConfiguration($configFile);
+            $config->load();
+            return $config;
+        });
         $dataSources = isset($config->dataSources) && is_array($config->dataSources) ? $config->dataSources : [];
 
         $request = $this->wiki->request;
@@ -112,10 +117,12 @@ class AdminImportersAction extends YesWikiAction
         $editableDataSources = $this->editableDataSources($dataSources, $importers);
         $autoSync = $this->autoSyncStatus($dataSources);
         ImportTimeline::mark('action: autoSyncStatus read (' . count($dataSources) . ' sources)');
-        $forms = $formManager->getAll();
-        ImportTimeline::mark('action: formManager->getAll() (' . count($forms) . ' forms)');
+        $forms = ImportTimeline::around('formManager->getAll()', function () use ($formManager) {
+            return $formManager->getAll();
+        });
+        ImportTimeline::mark('action: ' . count($forms) . ' forms loaded');
 
-        $rendered = $this->render('@importer/admin-importers.twig', [
+        $templateVars = [
             'currentUrl' => $this->wiki->href(),
             'autoSync' => $autoSync,
             'importers' => $importers,
@@ -128,10 +135,11 @@ class AdminImportersAction extends YesWikiAction
             'message' => $message,
             'syncOutput' => $syncOutput,
             'syncedSourceId' => $syncedSourceId,
-        ]);
-        ImportTimeline::mark('action: template rendered');
+        ];
 
-        return $rendered;
+        return ImportTimeline::around('render admin-importers.twig', function () use ($templateVars) {
+            return $this->render('@importer/admin-importers.twig', $templateVars);
+        });
     }
 
     /**

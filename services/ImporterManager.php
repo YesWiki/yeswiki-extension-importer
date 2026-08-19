@@ -17,6 +17,8 @@ class ImporterManager
     protected $formManager;
     protected $listManager;
     protected $wiki;
+    /** getAvailableImporters() is asked the same question once per importer per request. */
+    private $availableImporters = null;
 
     public function __construct(
         ParameterBagInterface $params,
@@ -36,13 +38,20 @@ class ImporterManager
 
     public function getAvailableImporters()
     {
+        if ($this->availableImporters !== null) {
+            return $this->availableImporters;
+        }
 
         $services = array_filter($this->wiki->services->getServiceIds(), function ($subject) {
             return preg_match('/Importer$/', $subject);
         });
+        ImportTimeline::mark('discovery: ' . count($services) . ' candidate service(s): ' . implode(', ', $services));
 
         $importers = [];
         foreach ($services as $serv) {
+            // is_subclass_of() on a string autoloads the class, so this is where an unrelated
+            // extension's "...Importer" gets its file included
+            ImportTimeline::mark('discovery: is_subclass_of ' . $serv);
             // The name alone is not enough: other extensions register their own "…Importer"
             // services (fulltextsearch's SealImporter / SealBatchImporter, for instance), and
             // they are not ours to instantiate. Only keep real subclasses of our base Importer.
@@ -58,6 +67,7 @@ class ImporterManager
             }
             $importers[$shortClass] = $serv;
         }
+        $this->availableImporters = $importers;
         return $importers;
     }
 
