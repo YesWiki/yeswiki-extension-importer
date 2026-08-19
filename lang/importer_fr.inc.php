@@ -32,6 +32,11 @@ return [
     'IMPORTER_FIELD_AUTH_USER' => 'Utilisateur admin distant',
     'IMPORTER_FIELD_AUTH_PASSWORD' => 'Mot de passe admin distant',
     'IMPORTER_FIELD_REMOTEFORMID' => 'Identifiant du formulaire Bazar distant',
+    'IMPORTER_FIELD_YESWIKILIST_URL' => 'Url des fiches du formulaire distant (api json)',
+    'IMPORTER_FIELD_YESWIKILIST_URL_HELP' => 'De la forme '
+        . 'https://mon-wiki-distant.fr/?api/forms/12/entries&fields=id_fiche,bf_titre — seuls '
+        . 'l\'identifiant et le titre des fiches servent à construire la liste, les demander '
+        . 'explicitement avec &fields= évite au wiki distant de renvoyer toutes les fiches en entier.',
     'IMPORTER_FIELD_YESWIKITOYESWIKI_URL' => 'Url des fiches du formulaire distant (api json)',
     'IMPORTER_FIELD_YESWIKITOYESWIKI_URL_HELP' => 'De la forme https://mon-wiki-distant.fr/?api/forms/12/entries/json — '
         . 'l\'identifiant du formulaire distant en est déduit. Les paramètres ajoutés à cette url '

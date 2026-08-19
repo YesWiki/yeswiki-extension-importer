@@ -267,7 +267,14 @@ class ImporterManager
         return number_format(microtime(true) - $startTime, 2) . 's';
     }
 
-    public function curl($url, $headers = [], $isPost = false, $postData = null, $noSSLCheck = false, $showHeader = false, $timeoutInSec = 10)
+    /**
+     * $timeoutInSec applies to the connection and to the transfer alike. The default is
+     * generous because the peer is a whole wiki answering an api call, not a static file: a
+     * remote wiki listing a large form's entries routinely takes longer than the ten seconds
+     * this used to allow, and the request then failed for no reason the admin could see.
+     * Callers with a configured timeout (YesWikiToYesWiki) pass their own.
+     */
+    public function curl($url, $headers = [], $isPost = false, $postData = null, $noSSLCheck = false, $showHeader = false, $timeoutInSec = 30)
     {
         $ch = curl_init($url);
         if ($showHeader) {
@@ -301,7 +308,7 @@ class ImporterManager
      * "{tag}_{field}_{name}" convention readable); it is always sanitized here, since it comes
      * from a remote source. Without it, the name is derived from the url as before.
      */
-    public function downloadFile($sourceUrl, $noSSLCheck = false, $timeoutInSec = 10, $replaceExisting = false, $destFileName = null)
+    public function downloadFile($sourceUrl, $noSSLCheck = false, $timeoutInSec = 30, $replaceExisting = false, $destFileName = null)
     {
         if (empty($sourceUrl)) {
             return '';
