@@ -147,14 +147,25 @@ class AdminImportersAction extends YesWikiAction
      * The "id => label" list the target-form select is built from.
      *
      * Deliberately not FormManager::getAll(): that one loads and fully prepares every form in
-     * the wiki, and on a large wiki it is what made this page time out. All the select needs
-     * is an id and a label, which recent core answers with a single query. Older core has no
-     * such method, hence the fallback.
+     * the wiki, and on a wiki whose forms are expensive to prepare it is what made this page
+     * time out (three minutes on hpf, where thirteen forms cost thirteen seconds each). All
+     * the select needs is an id and a label.
+     *
+     * Recent core answers that with one query, and failing that can at least list the ids for
+     * one more. Only a core offering neither falls back to getAll(): a select labelled by bare
+     * form ids is a worse select, but it is not a page that never loads.
      */
     private function formLabels(FormManager $formManager): array
     {
         if (is_callable([$formManager, 'getAllLabels'])) {
             return $formManager->getAllLabels();
+        }
+        if (is_callable([$formManager, 'getAllIds'])) {
+            $labels = [];
+            foreach ($formManager->getAllIds() as $formId) {
+                $labels[$formId] = (string) $formId;
+            }
+            return $labels;
         }
         $labels = [];
         foreach ($formManager->getAll() as $formId => $form) {
