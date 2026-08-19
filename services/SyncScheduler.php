@@ -75,11 +75,14 @@ class SyncScheduler
         if (PHP_SAPI === 'cli') {
             return;
         }
+        ImportTimeline::mark('scheduler: claiming due sources');
         try {
             $dueSources = $this->claimDueSources();
         } catch (\Throwable $ex) {
+            ImportTimeline::mark('scheduler: claim failed (' . $ex->getMessage() . ')');
             return; // scheduling an import must never break the page it was noticed from
         }
+        ImportTimeline::mark('scheduler: ' . count($dueSources) . ' source(s) due: ' . implode(', ', array_keys($dueSources)));
         if (empty($dueSources)) {
             return;
         }
@@ -92,6 +95,8 @@ class SyncScheduler
     {
         // the visitor has their page: let go of their connection where php-fpm allows it, and
         // keep going even when the browser hangs up, so a sync isn't left half applied
+        ImportTimeline::mark('scheduler: after-response sync starting (fastcgi_finish_request '
+            . (function_exists('fastcgi_finish_request') ? 'available' : 'MISSING - the browser waits for this') . ')');
         @ignore_user_abort(true);
         if (function_exists('fastcgi_finish_request')) {
             @fastcgi_finish_request();
@@ -104,6 +109,7 @@ class SyncScheduler
         } catch (\Throwable $ex) {
             // run() already swallows per-source errors; this is the last resort
         }
+        ImportTimeline::mark('scheduler: after-response sync finished');
     }
 
     /**
@@ -165,6 +171,7 @@ class SyncScheduler
             }
             $output = trim(ob_get_clean() . "\n" . $result);
             $this->recordRun((string) $id, $output);
+            ImportTimeline::mark('scheduler: synced source ' . $id);
         }
     }
 

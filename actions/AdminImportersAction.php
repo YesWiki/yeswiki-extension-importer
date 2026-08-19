@@ -8,12 +8,14 @@ use YesWiki\Core\Service\ConfigurationFileProvider;
 use YesWiki\Core\Service\ConfigurationService;
 use YesWiki\Core\YesWikiAction;
 use YesWiki\Importer\Service\ImporterManager;
+use YesWiki\Importer\Service\ImportTimeline;
 use YesWiki\Importer\Service\SyncScheduler;
 
 class AdminImportersAction extends YesWikiAction
 {
     public function run()
     {
+        ImportTimeline::mark('action: entered run()');
         if (!$this->wiki->UserIsAdmin()) {
             return $this->render('@templates/alert-message.twig', [
                 'type' => 'danger',
@@ -29,8 +31,10 @@ class AdminImportersAction extends YesWikiAction
             ]);
         }
 
+        ImportTimeline::mark('action: config file checked');
         $importerManager = $this->getService(ImporterManager::class);
         $importers = $importerManager->getAvailableImporters();
+        ImportTimeline::mark('action: getAvailableImporters (' . count($importers) . ' importers)');
         $formManager = $this->getService(FormManager::class);
         // each importer class (from this extension or any other) declares its own admin
         // fields via Importer::getAdminFields()/needsBazarForm(), so this action stays
@@ -54,8 +58,10 @@ class AdminImportersAction extends YesWikiAction
             }
         }
 
+        ImportTimeline::mark('action: admin fields collected');
         $config = $this->getService(ConfigurationService::class)->getConfiguration($configFile);
         $config->load();
+        ImportTimeline::mark('action: wakka.config.php loaded');
         $dataSources = isset($config->dataSources) && is_array($config->dataSources) ? $config->dataSources : [];
 
         $request = $this->wiki->request;
@@ -102,22 +108,30 @@ class AdminImportersAction extends YesWikiAction
 
         // both the sources table and the edit form show what was typed in, not how it ended up
         // stored (an importer may split one typed value into several config keys)
+        ImportTimeline::mark('action: POST branch done');
         $editableDataSources = $this->editableDataSources($dataSources, $importers);
+        $autoSync = $this->autoSyncStatus($dataSources);
+        ImportTimeline::mark('action: autoSyncStatus read (' . count($dataSources) . ' sources)');
+        $forms = $formManager->getAll();
+        ImportTimeline::mark('action: formManager->getAll() (' . count($forms) . ' forms)');
 
-        return $this->render('@importer/admin-importers.twig', [
+        $rendered = $this->render('@importer/admin-importers.twig', [
             'currentUrl' => $this->wiki->href(),
-            'autoSync' => $this->autoSyncStatus($dataSources),
+            'autoSync' => $autoSync,
             'importers' => $importers,
             'importerFields' => $importerFields,
             'importersWithoutForm' => $importersWithoutForm,
             'importersWithFieldMapping' => $importersWithFieldMapping,
-            'forms' => $formManager->getAll(),
+            'forms' => $forms,
             'dataSources' => $editableDataSources,
             'dataSourcesJson' => json_encode($editableDataSources, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP),
             'message' => $message,
             'syncOutput' => $syncOutput,
             'syncedSourceId' => $syncedSourceId,
         ]);
+        ImportTimeline::mark('action: template rendered');
+
+        return $rendered;
     }
 
     /**
