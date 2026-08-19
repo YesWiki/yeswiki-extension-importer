@@ -112,8 +112,8 @@
     <div class="">
       <select required class="form-control" id="formId" name="formId">
         <option value="new">{{ _t('IMPORTER_FORM_NEW') }}</option>
-        {% for formId,form in forms %}
-        <option value="{{ formId }}">{{ form.bn_label_nature|default(formId) }} ({{ formId }})</option>
+        {% for formId,formLabel in forms %}
+        <option value="{{ formId }}">{{ formLabel|default(formId) }} ({{ formId }})</option>
         {% endfor %}
       </select>
     </div>

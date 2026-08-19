@@ -117,10 +117,11 @@ class AdminImportersAction extends YesWikiAction
         $editableDataSources = $this->editableDataSources($dataSources, $importers);
         $autoSync = $this->autoSyncStatus($dataSources);
         ImportTimeline::mark('action: autoSyncStatus read (' . count($dataSources) . ' sources)');
-        $forms = ImportTimeline::around('formManager->getAll()', function () use ($formManager) {
-            return $formManager->getAll();
+        $this->probeFormsOneByOne($formManager);
+        $forms = ImportTimeline::around('form labels', function () use ($formManager) {
+            return $this->formLabels($formManager);
         });
-        ImportTimeline::mark('action: ' . count($forms) . ' forms loaded');
+        ImportTimeline::mark('action: ' . count($forms) . ' forms listed');
 
         $templateVars = [
             'currentUrl' => $this->wiki->href(),
@@ -140,6 +141,46 @@ class AdminImportersAction extends YesWikiAction
         return ImportTimeline::around('render admin-importers.twig', function () use ($templateVars) {
             return $this->render('@importer/admin-importers.twig', $templateVars);
         });
+    }
+
+    /**
+     * The "id => label" list the target-form select is built from.
+     *
+     * Deliberately not FormManager::getAll(): that one loads and fully prepares every form in
+     * the wiki, and on a large wiki it is what made this page time out. All the select needs
+     * is an id and a label, which recent core answers with a single query. Older core has no
+     * such method, hence the fallback.
+     */
+    private function formLabels(FormManager $formManager): array
+    {
+        if (is_callable([$formManager, 'getAllLabels'])) {
+            return $formManager->getAllLabels();
+        }
+        $labels = [];
+        foreach ($formManager->getAll() as $formId => $form) {
+            $labels[$formId] = $form['label'] ?? $form['bn_label_nature'] ?? (string) $formId;
+        }
+        return $labels;
+    }
+
+    /**
+     * TEMPORARY - with "&importerdebug=forms" in the url, load the forms one at a time so the
+     * timeline names the one that hangs. getAll() loads them all inside a single call, so on
+     * its own it only tells us that some form, somewhere, is the problem.
+     */
+    private function probeFormsOneByOne(FormManager $formManager): void
+    {
+        if (($_GET['importerdebug'] ?? '') !== 'forms' || !is_callable([$formManager, 'getAllIds'])) {
+            return;
+        }
+        $ids = ImportTimeline::around('getAllIds()', function () use ($formManager) {
+            return $formManager->getAllIds();
+        });
+        foreach ($ids as $formId) {
+            ImportTimeline::around('getOne(' . $formId . ')', function () use ($formManager, $formId) {
+                return $formManager->getOne($formId);
+            });
+        }
     }
 
     /**
