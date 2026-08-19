@@ -42,7 +42,7 @@ class SyncScheduler
     /** Touched by core right before each of its maintenance sweeps, inside the cache dir. */
     private const CORE_MAINTENANCE_LOCK = 'maintenance.lock';
 
-    /** Where this extension keeps one "last automatic sync" file per source. */
+    /** Where this extension keeps one "last sync" file per source, whoever asked for it. */
     private const STATE_DIR = 'importer';
 
     /** A sync's kept output, tail first: a log nobody rotates must not grow forever. */
@@ -176,10 +176,11 @@ class SyncScheduler
     }
 
     /**
-     * What the last automatic sync of $source did, or null if it never ran.
+     * What the last sync of $source did, or null if it never ran. Covers both the automatic
+     * syncs run from here and the ones an admin asked for from the admin page.
      * @return array|null ['time' => int timestamp, 'output' => string]
      */
-    public function getLastAutoSync(string $source): ?array
+    public function getLastSync(string $source): ?array
     {
         $file = $this->stateFile($source);
         if ($file === null || !is_file($file)) {
@@ -233,7 +234,13 @@ class SyncScheduler
         return @touch($file);
     }
 
-    private function recordRun(string $source, string $output): void
+    /**
+     * Record that $source has just been synced, and what it printed. Public because a sync
+     * triggered by hand from the admin page is still a sync of that source: it belongs in the
+     * same file the "last sync" column reads, and it should postpone that source's next
+     * automatic sync by one cycle the same way an automatic one does.
+     */
+    public function recordRun(string $source, string $output): void
     {
         $file = $this->stateFile($source);
         if ($file === null) {

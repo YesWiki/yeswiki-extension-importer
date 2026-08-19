@@ -57,9 +57,9 @@ return [
     'IMPORTER_FIELD_SYNCINTERVALINMIN' => 'Intervalle minimum entre deux synchronisations automatiques, en minutes (optionnel)',
     'IMPORTER_FIELD_SYNCINTERVALINMIN_HELP' => 'Laisser vide pour synchroniser à chaque maintenance de YesWiki. '
         . 'Par exemple 1440 pour ne pas synchroniser cette source plus d\'une fois par jour.',
-    'IMPORTER_LAST_AUTO_SYNC' => 'Dernière synchro auto',
-    'IMPORTER_AUTO_SYNC_NEVER' => 'jamais',
-    'IMPORTER_AUTO_SYNC_DISABLED' => '—',
+    'IMPORTER_LAST_SYNC' => 'Dernière synchro',
+    'IMPORTER_SYNC_NEVER' => 'jamais',
+    'IMPORTER_SYNC_AUTO' => 'auto',
 
     'IMPORTER_FIELD_MAPPING_TITLE' => 'Correspondance des champs',
     'IMPORTER_FIELD_MAPPING_REMOTE' => 'Champ à importer',

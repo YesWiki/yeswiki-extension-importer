@@ -98,6 +98,9 @@ class AdminImportersAction extends YesWikiAction
             ob_start();
             $result = $importerManager->syncSource($syncedSourceId, $dataSources[$syncedSourceId]);
             $syncOutput = trim(ob_get_clean() . "\n" . $result);
+            // a sync is a sync, whoever asked for it: record it where the "last sync" column
+            // reads from, so a source synced only by hand doesn't read as never synced
+            $this->getService(SyncScheduler::class)->recordRun($syncedSourceId, $syncOutput);
         } elseif (!empty($importer)) {
             $sourceOptions = $importerManager->collectSourceOptionsFromInput($importer, $importerFields, $request->request->all());
             $id = $request->request->get('id') ?: $this->newSourceId($importer, $sourceOptions, $dataSources);
@@ -115,8 +118,8 @@ class AdminImportersAction extends YesWikiAction
         // stored (an importer may split one typed value into several config keys)
         ImportTimeline::mark('action: POST branch done');
         $editableDataSources = $this->editableDataSources($dataSources, $importers);
-        $autoSync = $this->autoSyncStatus($dataSources);
-        ImportTimeline::mark('action: autoSyncStatus read (' . count($dataSources) . ' sources)');
+        $syncStatus = $this->syncStatus($dataSources);
+        ImportTimeline::mark('action: syncStatus read (' . count($dataSources) . ' sources)');
         $this->probeFormsOneByOne($formManager);
         $forms = ImportTimeline::around('form labels', function () use ($formManager) {
             return $this->formLabels($formManager);
@@ -125,7 +128,7 @@ class AdminImportersAction extends YesWikiAction
 
         $templateVars = [
             'currentUrl' => $this->wiki->href(),
-            'autoSync' => $autoSync,
+            'syncStatus' => $syncStatus,
             'importers' => $importers,
             'importerFields' => $importerFields,
             'importersWithoutForm' => $importersWithoutForm,
@@ -195,18 +198,18 @@ class AdminImportersAction extends YesWikiAction
     }
 
     /**
-     * What each source's automatic sync (config 'syncOnMaintenance') has been up to, so that
-     * a sync nobody triggered by hand isn't invisible: an admin needs to see that it ran, when,
-     * and what it did.
+     * When each source was last synced and what it printed, plus whether it also syncs itself
+     * (config 'syncOnMaintenance'). The date covers manual and automatic syncs alike: what an
+     * admin needs from that column is how stale a source is, not who asked for it last.
      */
-    private function autoSyncStatus(array $dataSources): array
+    private function syncStatus(array $dataSources): array
     {
         $scheduler = $this->getService(SyncScheduler::class);
         $status = [];
         foreach ($dataSources as $id => $source) {
             $status[$id] = [
-                'enabled' => !empty($source['syncOnMaintenance']),
-                'last' => $scheduler->getLastAutoSync((string) $id),
+                'autoEnabled' => !empty($source['syncOnMaintenance']),
+                'last' => $scheduler->getLastSync((string) $id),
             ];
         }
         return $status;
