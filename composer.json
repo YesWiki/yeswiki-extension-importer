@@ -1,4 +1,6 @@
 {
+    "name": "yeswiki/extension-importer",
+    "type": "yeswiki-extension",
     "require": {
         "league/html-to-markdown": "^5.1",
         "php-imap/php-imap": "^5.0"
