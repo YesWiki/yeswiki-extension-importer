@@ -3,7 +3,7 @@
     "type": "yeswiki-extension",
     "require": {
         "league/html-to-markdown": "^5.1",
-        "php-imap/php-imap": "^5.0"
+        "php-imap/php-imap": "^6.0"
     },
     "config": {
         "autoloader-suffix": "importer"

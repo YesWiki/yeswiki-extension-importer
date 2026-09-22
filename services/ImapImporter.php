@@ -127,7 +127,7 @@ EOT,
         try {
             // PHP.net imap_search criteria: http://php.net/manual/en/function.imap-search.php
             $mailsIds = $this->mailBox->searchMailbox($this->config['imap_query']);
-        } catch (PhpImap\Exceptions\ConnectionException $ex) {
+        } catch (\PhpImap\Exceptions\ConnectionException $ex) {
             echo "IMAP connection failed: " . implode(",", $ex->getErrors('all'));
             die();
         }
