@@ -112,13 +112,12 @@ class YesWikiListImporter extends Importer
     {
         $listId = $this->config['listId'];
         $title = $this->config['title'] ?? $listId;
-        if ($this->listManager->isList($listId)) {
-            $this->listManager->update($listId, $title, $data);
-            echo 'La liste "' . $listId . '" a été mise à jour avec ' . count($data) . ' valeur(s).' . "\n";
-        } else {
-            $this->listManager->create($title, $data, $listId);
-            echo 'La liste "' . $listId . '" a été créée avec ' . count($data) . ' valeur(s).' . "\n";
-        }
-        return;
+        $messages = [
+            'created' => 'a été créée avec',
+            'updated' => 'a été mise à jour avec',
+            'unchanged' => 'est déjà à jour, non réécrite :',
+        ];
+        $result = $this->writeList($listId, $title, $data);
+        echo 'La liste "' . $listId . '" ' . $messages[$result] . ' ' . count($data) . ' valeur(s).' . "\n";
     }
 }

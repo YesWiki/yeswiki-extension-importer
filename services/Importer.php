@@ -8,6 +8,7 @@ use YesWiki\Importer\Service\ImporterManager;
 use YesWiki\Bazar\Service\EntryManager;
 use YesWiki\Bazar\Service\FormManager;
 use YesWiki\Bazar\Service\ListManager;
+use YesWiki\Core\Service\PageManager;
 use YesWiki\Wiki;
 
 abstract class Importer
@@ -164,6 +165,22 @@ abstract class Importer
     protected function getService($class)
     {
         return $this->services->get($class);
+    }
+
+    /**
+     * Creates or updates a list and returns 'created', 'updated' or 'unchanged' (stored body already identical).
+     */
+    protected function writeList(string $id, string $title, array $nodes): string
+    {
+        if (!$this->listManager->isList($id)) {
+            $this->listManager->create($title, $nodes, $id);
+            return 'created';
+        }
+        $pageManager = $this->getService(PageManager::class);
+        $before = $pageManager->getOne($id, null, false, true)['body'] ?? null;
+        $this->listManager->update($id, $title, $nodes);
+        $after = $pageManager->getOne($id, null, false, true)['body'] ?? null;
+        return $after === $before ? 'unchanged' : 'updated';
     }
 
     /**

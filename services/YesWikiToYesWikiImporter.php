@@ -671,20 +671,17 @@ class YesWikiToYesWikiImporter extends Importer
         }
         $remoteNodes = $remoteList['nodes'] ?? [];
         $remoteTitle = $remoteList['title'] ?? $localTag;
-        $exists = $this->listManager->isList($localTag);
 
         if ($mirror) {
-            if ($exists) {
-                $this->listManager->update($localTag, $remoteTitle, $remoteNodes);
-            } else {
-                $this->listManager->create($remoteTitle, $remoteNodes, $localTag);
-            }
-            echo 'Liste "' . $localTag . '" synchronisée (miroir) avec ' . count($remoteNodes) . ' valeur(s).' . "\n";
+            $result = $this->writeList($localTag, $remoteTitle, $remoteNodes);
+            echo $result === 'unchanged'
+                ? 'Liste "' . $localTag . '" déjà à jour (miroir, ' . count($remoteNodes) . ' valeur(s)), non réécrite.' . "\n"
+                : 'Liste "' . $localTag . '" synchronisée (miroir) avec ' . count($remoteNodes) . ' valeur(s).' . "\n";
             return;
         }
 
         // allow_local: non-destructive union, local-only values are never removed
-        $existingList = $exists ? $this->listManager->getOne($localTag) : null;
+        $existingList = $this->listManager->isList($localTag) ? $this->listManager->getOne($localTag) : null;
         $byId = [];
         foreach (($existingList['nodes'] ?? []) as $node) {
             $byId[$node['id']] = $node;
@@ -694,12 +691,10 @@ class YesWikiToYesWikiImporter extends Importer
         }
         $mergedNodes = array_values($byId);
         $title = $existingList['title'] ?? $remoteTitle;
-        if ($exists) {
-            $this->listManager->update($localTag, $title, $mergedNodes);
-        } else {
-            $this->listManager->create($title, $mergedNodes, $localTag);
-        }
-        echo 'Liste "' . $localTag . '" fusionnée (total local : ' . count($mergedNodes) . ' valeur(s)).' . "\n";
+        $result = $this->writeList($localTag, $title, $mergedNodes);
+        echo $result === 'unchanged'
+            ? 'Liste "' . $localTag . '" déjà à jour (total local : ' . count($mergedNodes) . ' valeur(s)), non réécrite.' . "\n"
+            : 'Liste "' . $localTag . '" fusionnée (total local : ' . count($mergedNodes) . ' valeur(s)).' . "\n";
     }
 
     /**
