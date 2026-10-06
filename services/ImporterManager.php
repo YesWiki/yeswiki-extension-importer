@@ -240,7 +240,7 @@ class ImporterManager
         return $result;
     }
 
-    public function syncSource($source, $sourceOptions)
+    public function syncSource($source, $sourceOptions, bool $wipe = false)
     {
         $startTime = microtime(true);
         try {
@@ -250,7 +250,18 @@ class ImporterManager
                 return 'Importer ' . $sourceOptions['importer'] . ' not found';
             }
             $data = $importer->getData();
+            // importers report a failed fetch with an empty array or an error string
+            $sourceAnswered = is_array($data) && !empty($data);
             $data = $importer->mapData($data);
+            // wipe only once the source has answered, so a failed fetch does not leave the form empty
+            if ($wipe && $importer::needsBazarForm() && !empty($sourceOptions['formId'])) {
+                if ($sourceAnswered) {
+                    $this->formManager->delete($sourceOptions['formId']);
+                    echo _t('IMPORTER_SOURCE_WIPED', ['formId' => $sourceOptions['formId']]) . "\n";
+                } else {
+                    echo _t('IMPORTER_WIPE_SKIPPED', ['formId' => $sourceOptions['formId']]) . "\n";
+                }
+            }
             $importer->syncFormModel();
             $importer->syncData($data);
         } catch (\Throwable $th) {
