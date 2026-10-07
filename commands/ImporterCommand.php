@@ -80,7 +80,7 @@ class ImporterCommand extends Command
                     continue;
                 }
                 $output->writeln("Importing source \"{$source}\"");
-                $output->writeln($this->importer->syncSource($source, $sourceOptions));
+                $output->writeln($this->importer->syncSource($source, $sourceOptions, $hasWipe));
             }
             return Command::SUCCESS;
         } else {
@@ -89,7 +89,7 @@ class ImporterCommand extends Command
                 return Command::SUCCESS;
             }
             $output->writeln("Importing source \"{$source}\"");
-            $res = $this->importer->syncSource($source, $this->wiki->config['dataSources'][$source]);
+            $res = $this->importer->syncSource($source, $this->wiki->config['dataSources'][$source], $hasWipe);
             $output->writeln($res);
             return Command::SUCCESS;
         }

@@ -10,6 +10,8 @@ return [
     'SOURCE_SUCCESSFULLY_SYNCED'  => 'Source "%{source}" synchronisée avec succès.',
     'IMPORTER_SYNC_RUN' => 'Lancer la synchronisation',
     'IMPORTER_ELAPSED_TIME' => '(en %{duration})',
+    'IMPORTER_SOURCE_WIPED' => 'Formulaire %{formId} effacé avec ses fiches avant réimport.',
+    'IMPORTER_WIPE_SKIPPED' => 'La source n\'a rien renvoyé : le formulaire %{formId} n\'est pas effacé.',
     'IMPORTER_ADD_SOURCE' => 'Ajouter une source',
     'IMPORTER_EDIT_SOURCE' => 'Modifier la source',
     'IMPORTER_CANCEL_EDIT' => 'Annuler la modification',
