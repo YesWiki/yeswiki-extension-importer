@@ -12,6 +12,7 @@ premier temps sera la source de vérité.
 - mastodon activityPub
 - YesWiki to YesWiki (liste de fiches `id_fiche`/`bf_titre`) `YesWikiListImporter`
 - YesWiki to YesWiki (fiches Bazar complètes) `YesWikiToYesWikiImporter`
+- Louty, logiciel de gestion de CAE (clients, devis, factures, avoirs) `LoutyImporter`
 - Données géographiques de l'état
 - yunohost listes d'apps/utilisateurices publiques/privées : voir l'extension
   `yeswiki-extension-yunohost` (`YunohostCLIAppImporter`/`YunohostCLIUserImporter`),
@@ -171,6 +172,49 @@ d'utilisateur·ice d'un compte admin local), la mise à jour de fiches déjà
 existantes échouera par manque de droits dès la 2ᵉ synchro (message
 "Vous n'avez pas les permissions pour éditer ce fichier" dans le journal). La
 création de nouvelles fiches n'est pas concernée.
+
+### `Louty`
+
+Importe les clients, devis, factures et avoirs d'une ou plusieurs activités de
+[Louty](https://appli.louty.net), le logiciel de gestion de certaines CAE. Louty
+n'a pas d'API publique pour les pièces : l'importer se connecte comme un
+navigateur, lit la liste des pièces et la page de consultation de chacune, puis
+remplit trois formulaires Bazar.
+
+```php
+'dataSources' => [
+    'louty' => [
+        'importer' => 'Louty',
+        'auth' => ['user' => 'identifiant-louty', 'password' => '...'],
+        'activites' => 'AAYESWI0',
+        'clientFormId' => 101,
+        'pieceFormId' => 102,
+        'ligneFormId' => 103,
+        'localAdminUser' => 'WikiAdmin',
+    ],
+],
+```
+
+- `activites` : codes des activités à importer, séparés par des virgules. Rien
+  d'autre n'est lu. Une pièce peut contenir des lignes d'autres activités :
+  elles sont ignorées, et leur nombre est noté dans le champ
+  `bf_lignes_ignorees` de la pièce.
+- Les trois formulaires sont créés s'ils n'existent pas, avec des ACL
+  `@admins`. On peut aussi pointer vers des formulaires existants et leur
+  ajouter des champs : l'importer ne réécrit que ses propres champs
+  (`bf_louty_id`, `bf_numero`, `bf_montant_ht`…) et laisse les autres
+  intacts.
+- Liens entre fiches : la pièce pointe vers son client (`bf_client`), la
+  facture vers son devis et l'avoir vers la facture annulée
+  (`bf_piece_origine`), la ligne vers sa pièce (`bf_piece`) et vers la ligne de
+  devis dont elle vient (`bf_ligne_origine`).
+- Seules les pièces nouvelles, modifiées ou en brouillon sont relues en
+  détail. Le premier import d'environ 400 pièces prend quelques minutes, les
+  suivants une trentaine de secondes.
+- Un brouillon supprimé dans Louty est supprimé du wiki avec ses lignes.
+- L'importer ne fait que lire. Il refuse tout appel d'écriture vers Louty.
+- `localAdminUser` : voir plus haut. Sans lui, l'importer prend le premier
+  admin du wiki.
 
 ## Utilisation
 

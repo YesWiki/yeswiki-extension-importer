@@ -44,6 +44,10 @@ return [
         . 'l\'identifiant du formulaire distant en est déduit. Les paramètres ajoutés à cette url '
         . '(par exemple &query=bf_ville=Marseille) sont conservés, pour n\'importer qu\'une partie des fiches.',
     'IMPORTER_FIELD_LOCALADMINUSER' => 'Nom d\'utilisateur admin local (optionnel, mais requis pour mettre à jour des fiches existantes)',
+    'IMPORTER_FIELD_ACTIVITES' => 'Codes des activités Louty à importer, séparés par des virgules (ex : AAYESWI0)',
+    'IMPORTER_FIELD_CLIENTFORMID' => 'Identifiant du formulaire Bazar des clients',
+    'IMPORTER_FIELD_PIECEFORMID' => 'Identifiant du formulaire Bazar des pièces (devis, factures, avoirs)',
+    'IMPORTER_FIELD_LIGNEFORMID' => 'Identifiant du formulaire Bazar des lignes de pièces',
     'IMPORTER_FIELD_SYNCMODE' => 'Mode de synchronisation',
     'IMPORTER_SYNCMODE_SOURCE_OF_TRUTH' => 'Le wiki distant fait autorité (miroir complet, y compris suppressions)',
     'IMPORTER_SYNCMODE_ALLOW_LOCAL' => 'Synchronisation souple (fiches et modifications locales conservées)',
