@@ -143,6 +143,19 @@ class LoutyParser
         ];
     }
 
+    // Returns id (or name) => value of the hidden inputs of an HTML page or fragment.
+    public static function hiddenInputs(string $html): array
+    {
+        $inputs = [];
+        foreach (self::xpath($html)->query('//input[@type="hidden"]') as $input) {
+            $key = $input->getAttribute('id') ?: $input->getAttribute('name');
+            if ($key !== '') {
+                $inputs[$key] = $input->getAttribute('value');
+            }
+        }
+        return $inputs;
+    }
+
     private static function xpath(string $html): \DOMXPath
     {
         $dom = new \DOMDocument();

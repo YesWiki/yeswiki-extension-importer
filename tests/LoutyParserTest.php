@@ -73,6 +73,14 @@ class LoutyParserTest extends TestCase
         $this->assertNull($autre['ligneOrigineId']);
     }
 
+    public function testHiddenInputs(): void
+    {
+        $inputs = LoutyParser::hiddenInputs('<tr id="pli_-1"><td><input type="hidden" id="pli_article_key_-1" value="7431" /><input type="hidden" id="pli_unite_key_-1" value="546" /><input type="text" id="x" value="no" /></td></tr>');
+        $this->assertSame(['pli_article_key_-1' => '7431', 'pli_unite_key_-1' => '546'], $inputs);
+        $this->assertSame('10,00', \YesWiki\Importer\Service\LoutyClient::frenchNumber(10));
+        $this->assertSame('45,50', \YesWiki\Importer\Service\LoutyClient::frenchNumber(45.5));
+    }
+
     public function testMapping(): void
     {
         [$facture] = LoutyParser::pieceList(self::fixture('liste.html'));
