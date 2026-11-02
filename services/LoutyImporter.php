@@ -211,7 +211,7 @@ class LoutyImporter extends Importer
             'bf_numero_client' => $c['compteClient']['code'] ?? '',
             'bf_categorie' => $c['categorieLibelle'] ?? '',
             'bf_adresse' => implode("\n", array_filter($c['listAdresse'] ?? [$c['resumeAdresse'] ?? ''])),
-            'bf_mail' => $c['courrielPrincipal'] ?? (explode(',', $c['resumeCourriel'] ?? '')[0] ?? ''),
+            'bf_courriel' => $c['courrielPrincipal'] ?? (explode(',', $c['resumeCourriel'] ?? '')[0] ?? ''),
             'bf_telephone' => $c['telephonePrincipal'] ?? ($c['resumeTelephone'] ?? ''),
             'bf_contact' => $c['resumeContact'] ?? '',
             'bf_siret' => $c['numeroSiret'] ?? '',
@@ -286,7 +286,7 @@ class LoutyImporter extends Importer
             'client' => [
                 "texte***bf_titre***Nom***255***255*** *** ***text***1*** *** *** * *** * *** *** *** ***",
                 $text('bf_louty_id', 'Id Louty'), $text('bf_numero_client', 'N° client'), $text('bf_categorie', 'Catégorie'),
-                $long('bf_adresse', 'Adresse'), "champs_mail***bf_mail***Courriel*** *** *** *** *** ***0*** *** *** * *** * *** *** *** ***",
+                $long('bf_adresse', 'Adresse'), "champs_mail***bf_courriel***Courriel*** *** *** *** *** ***0*** *** *** * *** * *** *** *** ***",
                 $text('bf_telephone', 'Téléphone'), $text('bf_contact', 'Contact'), $text('bf_siret', 'SIRET'), $text('bf_tva', 'N° TVA'),
             ],
             'piece' => [
