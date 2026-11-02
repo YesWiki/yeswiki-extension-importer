@@ -106,4 +106,18 @@ class LoutyParserTest extends TestCase
         $this->assertStringContainsString('listefiche***102***Pièce*** *** *** ***bf_piece***', LoutyImporter::formTemplate('ligne', $config));
         $this->assertStringEndsWith('acls***@admins***@admins***@admins***', LoutyImporter::formTemplate('client', $config));
     }
+
+    public function testCancelledPairs(): void
+    {
+        $rows = [
+            1 => ['type' => 'FC', 'montantHT' => 78.0],
+            2 => ['type' => 'AV', 'montantHT' => -78.0],
+            3 => ['type' => 'FC', 'montantHT' => 300.0],
+            4 => ['type' => 'AV', 'montantHT' => -100.0],
+            5 => ['type' => 'AV', 'montantHT' => -50.0],
+            6 => ['type' => 'FC', 'montantHT' => 50.0],
+        ];
+        $details = [2 => ['pieceOrigineId' => 1], 4 => ['pieceOrigineId' => 3], 5 => ['pieceOrigineId' => null]];
+        $this->assertSame([2, 1], LoutyImporter::cancelledPairs($rows, $details));
+    }
 }

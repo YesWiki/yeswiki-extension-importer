@@ -67,6 +67,7 @@ class LoutyImporter extends Importer
             'pieceFormId' => ['type' => 'number', 'required' => true],
             'ligneFormId' => ['type' => 'number', 'required' => true],
             'localAdminUser' => ['type' => 'text', 'required' => false],
+            'ignorerAnnulations' => ['type' => 'checkbox', 'required' => false],
         ];
     }
 
@@ -87,14 +88,37 @@ class LoutyImporter extends Importer
                 $row['hash'] = self::hash($row);
                 $data['pieces'][$row['id']] = $row;
                 $entry = $known[$row['id']] ?? null;
-                if ($entry === null || ($entry['bf_louty_hash'] ?? '') !== $row['hash'] || $row['etat'] === 'B') {
+                if ($entry === null || ($entry['bf_louty_hash'] ?? '') !== $row['hash'] || $row['etat'] === 'B' || $row['type'] === 'AV') {
                     $data['details'][$row['id']] = $this->client->getPiece($row['id']);
                 }
             }
         }
         echo count($data['pieces']) . ' pièce(s) Louty, ' . count($data['details']) . ' à relire en détail.' . "\n";
+        if ($this->config['ignorerAnnulations'] ?? true) {
+            $annulees = self::cancelledPairs($data['pieces'], $data['details']);
+            $data['pieces'] = array_diff_key($data['pieces'], array_flip($annulees));
+            $data['details'] = array_diff_key($data['details'], array_flip($annulees));
+            echo (count($annulees) / 2) . ' facture(s) annulée(s) par un avoir total, ignorée(s) avec leur avoir.' . "\n";
+        }
         $data['clients'] = $this->client->getClients(array_column($data['pieces'], 'clientId'));
         return $data;
+    }
+
+    // Ids of invoices fully cancelled by a credit note, and of those credit notes (their HT amounts cancel out).
+    public static function cancelledPairs(array $rows, array $details): array
+    {
+        $ids = [];
+        foreach ($rows as $id => $row) {
+            $origine = $details[$id]['pieceOrigineId'] ?? null;
+            if ($row['type'] !== 'AV' || !$origine || !isset($rows[$origine]) || $rows[$origine]['type'] !== 'FC') {
+                continue;
+            }
+            if (abs((float) $row['montantHT'] + (float) $rows[$origine]['montantHT']) < 0.01) {
+                $ids[] = $id;
+                $ids[] = $origine;
+            }
+        }
+        return array_values(array_unique($ids));
     }
 
     // Turns Louty data into Bazar entries, keyed by Louty id.

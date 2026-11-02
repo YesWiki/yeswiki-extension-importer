@@ -47,6 +47,7 @@ return [
     'IMPORTER_FIELD_ACTIVITES' => 'Codes des activités Louty à importer, séparés par des virgules (ex : AAYESWI0)',
     'IMPORTER_FIELD_CLIENTFORMID' => 'Identifiant du formulaire Bazar des clients',
     'IMPORTER_FIELD_PIECEFORMID' => 'Identifiant du formulaire Bazar des pièces (devis, factures, avoirs)',
+    'IMPORTER_FIELD_IGNORERANNULATIONS' => 'Ignorer les factures annulées par un avoir total, et ces avoirs',
     'IMPORTER_FIELD_LIGNEFORMID' => 'Identifiant du formulaire Bazar des lignes de pièces',
     'IMPORTER_FIELD_SYNCMODE' => 'Mode de synchronisation',
     'IMPORTER_SYNCMODE_SOURCE_OF_TRUTH' => 'Le wiki distant fait autorité (miroir complet, y compris suppressions)',
