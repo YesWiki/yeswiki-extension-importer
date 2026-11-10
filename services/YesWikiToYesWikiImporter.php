@@ -14,23 +14,7 @@ use YesWiki\Core\Service\TripleStore;
 use YesWiki\Core\Service\UserManager;
 use YesWiki\Wiki;
 
-/**
- * Imports Bazar entries from a remote YesWiki's form into a local form.
- *
- * Two sync modes (config['syncMode']):
- * - 'source_of_truth': the local form/lists/entries are a continuous mirror
- *   of the remote ones (including deletions).
- * - 'allow_local': the local form may differ (field mapping via
- *   config['fieldsMapping'] once it pre-exists); lists are merged without
- *   ever removing local-only values; entries are created/updated but never
- *   deleted, and are skipped if they were edited locally since our last sync.
- *
- * Two file modes (config['filesMode']) for the values of the remote form's file/image fields,
- * which are file names relative to the remote wiki's upload directory and therefore point at
- * nothing locally if copied as-is:
- * - 'download': the files are downloaded into the local upload directory.
- * - 'url': the local entries keep an absolute url to the file on the source wiki.
- */
+// Imports Bazar entries from a remote YesWiki form into a local form, with optional list and file sync.
 class YesWikiToYesWikiImporter extends Importer
 {
     protected $source;
@@ -63,16 +47,10 @@ class YesWikiToYesWikiImporter extends Importer
         $this->config = $config;
     }
 
-    /**
-     * Check if config input is good enough to be used by Importer
-     * @param array $config
-     * @return array $config checked config
-     */
+    // Check if config input is good enough to be used by Importer.
     public function checkConfig(array $config)
     {
         $config = parent::checkConfig($config);
-        // "url" is the remote form's entries API url, which already carries the remote form id
-        // (and, optionally, the query parameters restricting which entries to import)
         $parsedUrl = !empty($config['url']) ? self::parseEntriesUrl($config['url']) : null;
         if (!empty($parsedUrl)) {
             $config = array_merge($config, $parsedUrl);
@@ -142,19 +120,11 @@ class YesWikiToYesWikiImporter extends Importer
         return true;
     }
 
-    /**
-     * The admin pastes a single url, the remote form's entries API url (as displayed by the
-     * remote wiki itself, e.g. https://mon-wiki.fr/?api/forms/12/entries/json), so there is no
-     * separate remote form id to ask for. Split it into what the importer actually works with:
-     * the remote wiki's base url (which every other api call is built from), the remote form
-     * id, and the extra query parameters, if any, to forward when fetching the entries
-     * (&query=... to import only a subset of the remote form's entries).
-     */
+    // Build the stored config from the remote entries API url the admin pasted.
     public static function normalizeAdminOptions(array $options): array
     {
         $parsed = !empty($options['url']) ? self::parseEntriesUrl($options['url']) : null;
         if (empty($parsed)) {
-            // leave the url as typed: checkConfig() reports what's expected at sync time
             return $options;
         }
         if (empty($parsed['entriesQuery'])) {
@@ -163,9 +133,7 @@ class YesWikiToYesWikiImporter extends Importer
         return array_merge($options, $parsed);
     }
 
-    /**
-     * Rebuild the entries API url the admin pasted, to prefill the edit form with.
-     */
+    // Rebuild the entries API url the admin pasted, to prefill the edit form with
     public static function denormalizeAdminOptions(array $options): array
     {
         if (empty($options['url']) || empty($options['remoteFormId'])) {
@@ -176,13 +144,7 @@ class YesWikiToYesWikiImporter extends Importer
         return $options;
     }
 
-    /**
-     * Extract ['url' => remote wiki base url, 'remoteFormId' => ..., 'entriesQuery' => ...]
-     * from a remote form's entries API url, or null if that's not what was given.
-     * All the url shapes a YesWiki can produce are accepted: the usual "?api/..." shortcut,
-     * its "?wiki=api/..." long form, and the rewritten "/api/..." path, each possibly under a
-     * subfolder (for wikis not installed at their domain's root).
-     */
+    // Extract the remote wiki url, form id and entries query from an entries API url.
     public static function parseEntriesUrl(string $url): ?array
     {
         $parts = parse_url(trim($url));
@@ -211,7 +173,6 @@ class YesWikiToYesWikiImporter extends Importer
             $apiPos = strpos($path, 'api/forms');
             $basePath = $apiPos === false ? '' : substr($path, 0, $apiPos);
         }
-        // "https://mon-wiki.fr/index.php?api/..." : the entry script is not part of the base url
         $basePath = preg_replace('~/[^/]*\.php$~', '', rtrim($basePath, '/'));
         return [
             'url' => ($parts['scheme'] ?? 'https') . '://' . $parts['host']
@@ -268,7 +229,6 @@ class YesWikiToYesWikiImporter extends Importer
         $this->localFormExists = !empty($localForm);
 
         if (!$this->localFormExists || $isSourceOfTruth) {
-            // local mirrors remote field-for-field
             $mapping = [];
             foreach ($remoteFieldsByProperty as $propertyName => $field) {
                 $mapping[$propertyName] = $propertyName;
@@ -306,17 +266,12 @@ class YesWikiToYesWikiImporter extends Importer
             }
         }
 
-        // file/image fields hold a file name relative to the remote wiki's upload directory:
-        // remember where they land locally, syncData() turns them into something the local
-        // wiki can actually serve (a downloaded file, or an url to the source wiki)
         $this->fileFieldKeys = [];
         foreach ($mapping as $remoteField => $localField) {
             if ($this->isFileBackedField($remoteFieldsByProperty[$remoteField] ?? null)) {
                 $this->fileFieldKeys[] = $localField;
             }
         }
-        // an image that silently doesn't arrive is the hardest kind of import bug to see from
-        // the outside, so say which fields are being treated as files and how
         echo empty($this->fileFieldKeys)
             ? 'Aucun champ fichier/image dans la correspondance : les fichiers ne seront pas importés.' . "\n"
             : 'Champs fichier/image (' . $this->filesMode() . ') : ' . implode(', ', $this->fileFieldKeys) . "\n";
@@ -333,7 +288,6 @@ class YesWikiToYesWikiImporter extends Importer
                 }
             }
             $mappedEntry['_remote_url'] = $remoteEntry['url'];
-            // the remote wiki names these after its own core generation, so read both
             $mappedEntry['_remote_created'] = $remoteEntry['date_creation_fiche'] ?? $remoteEntry['created_at'] ?? null;
             $mappedEntry['_remote_updated'] = $remoteEntry['date_maj_fiche'] ?? $remoteEntry['updated_at'] ?? null;
             $mappedEntries[] = $mappedEntry;
@@ -382,25 +336,18 @@ class YesWikiToYesWikiImporter extends Importer
             $remoteUpdatedAt = $mappedEntry['_remote_updated'] ?? null;
             unset($mappedEntry['_remote_url'], $mappedEntry['_remote_created'], $mappedEntry['_remote_updated']);
             $title = $mappedEntry['bf_titre'] ?? $remoteUrl;
-            // required by EntryManager::validate() on both create() and update()
             $mappedEntry['antispam'] = 1;
 
             try {
                 $localId = $this->findLocalEntryByRemoteUrl($remoteUrl);
                 $localEntry = empty($localId) ? null : $this->entryManager->getOne($localId);
                 if (!empty($localId) && empty($localEntry)) {
-                    // stale mapping: the tripleStore still links this remote url to a local
-                    // entry that no longer exists (deleted outside this sync, or left over
-                    // from an earlier run) - clear it and treat it as "not found" instead of
-                    // crashing update() with a null $previousData; otherwise this dead mapping
-                    // would keep winning the lookup and re-trigger this same fallback (and
-                    // create a fresh duplicate entry) on every future sync
                     $this->getService(TripleStore::class)->delete($localId, TripleStore::SOURCE_URL_URI, null, '', '');
                     $localId = null;
                 }
 
                 if (empty($localId)) {
-                    $newValues = $this->withRemoteDates($this->importEntryFiles($mappedEntry), $remoteCreatedAt, $remoteUpdatedAt);
+                    $newValues = $this->withRemoteDates($this->importEntryFiles($mappedEntry, null), $remoteCreatedAt, $remoteUpdatedAt);
                     $created = $this->entryManager->create($this->config['formId'], $newValues, false, $remoteUrl);
                     if (!empty($created['id_fiche'])) {
                         $seenLocalIds[] = $created['id_fiche'];
@@ -413,7 +360,7 @@ class YesWikiToYesWikiImporter extends Importer
                 $seenLocalIds[] = $localId;
 
                 if ($isSourceOfTruth) {
-                    $newValues = $this->withRemoteDates($this->importEntryFiles($mappedEntry), $remoteCreatedAt, $remoteUpdatedAt);
+                    $newValues = $this->withRemoteDates($this->importEntryFiles($mappedEntry, $localEntry), $remoteCreatedAt, $remoteUpdatedAt);
                     $changed = $this->changedFields($localEntry, $newValues);
                     if (empty($changed)) {
                         $unchangedCount++;
@@ -424,14 +371,13 @@ class YesWikiToYesWikiImporter extends Importer
                     continue;
                 }
 
-                // allow_local: skip if a human edited the entry locally since our last write
                 $lastSync = $this->getLastSyncTime($localId);
                 $localDateMajFiche = $localEntry['date_maj_fiche'] ?? null;
                 if ($lastSync !== null && $localDateMajFiche !== null && $localDateMajFiche > $lastSync) {
                     echo 'Entrée "' . $title . '" modifiée localement, non synchronisée.' . "\n";
                     continue;
                 }
-                $newValues = $this->withRemoteDates($this->importEntryFiles($mappedEntry), $remoteCreatedAt, $remoteUpdatedAt);
+                $newValues = $this->withRemoteDates($this->importEntryFiles($mappedEntry, $localEntry), $remoteCreatedAt, $remoteUpdatedAt);
                 $changed = $this->changedFields($localEntry, $newValues);
                 if (empty($changed)) {
                     $unchangedCount++;
@@ -441,7 +387,6 @@ class YesWikiToYesWikiImporter extends Importer
                 $this->markSynced($localId, date('Y-m-d H:i:s'));
                 echo 'Entrée "' . $title . '" mise à jour : ' . implode(', ', $changed) . '.' . "\n";
             } catch (\Throwable $ex) {
-                // one invalid/incompatible remote entry must not abort the whole sync batch
                 echo 'Erreur sur l\'entrée "' . $title . '" : ' . $ex->getMessage() . "\n";
             }
         }
@@ -460,14 +405,12 @@ class YesWikiToYesWikiImporter extends Importer
         }
     }
 
-    // HELPERS
-
     private function noSSLCheck(): bool
     {
         return !empty($this->config['noSSLCheck']);
     }
 
-    // a full form/entries/list dump can be large, the default 10s curl timeout is often too short
+    // Timeout for remote calls, longer than curl's default since a full dump can be large.
     private function timeoutInSec(): int
     {
         return !empty($this->config['timeoutInSec']) ? (int) $this->config['timeoutInSec'] : 120;
@@ -492,23 +435,13 @@ class YesWikiToYesWikiImporter extends Importer
         return json_decode($response, true);
     }
 
-    /**
-     * True for a field backed by a YesWiki List (checkbox/radio/liste), false for the "*fiche"
-     * variants (checkboxfiche/radiofiche/listefiche) that link to another Bazar form's entries
-     * instead: both share the EnumField base class and its getLinkedObjectName(), but only the
-     * former points to an actual List page tag.
-     */
+    // True for a list-backed enum field (checkbox/radio/liste), false for the "*fiche" variants.
     private function isListBackedField($field): bool
     {
         return $field instanceof EnumField && !$field->isEnumEntryField();
     }
 
-    /**
-     * True for a field whose value is an attached file name (image, fichier, and any field
-     * deriving from them). Matched on the short class name rather than with instanceof: the
-     * bazar fields' namespace changed between YesWiki versions (Bazar\Field, Core\Field,
-     * Content\Field...) while their class names did not.
-     */
+    // True for a field whose value is an attached file name (image, fichier, and any field deriving from them)
     private function isFileBackedField($field): bool
     {
         for ($class = is_object($field) ? get_class($field) : ''; !empty($class); $class = get_parent_class($class)) {
@@ -520,12 +453,7 @@ class YesWikiToYesWikiImporter extends Importer
         return false;
     }
 
-    /**
-     * The entry keys holding the creation and modification dates on the running core. Ticket
-     * 27 renamed them: a core that predates it ignores the new names, a core that has them
-     * stores the old ones as stray body keys, so write whichever pair this one actually reads.
-     * @return array [createdKey, updatedKey]
-     */
+    // The entry keys holding the creation and modification dates on the running core
     private function dateKeys(): array
     {
         return defined(get_class($this->entryManager) . '::LEGACY_ENTRY_KEYS')
@@ -533,17 +461,7 @@ class YesWikiToYesWikiImporter extends Importer
             : ['date_creation_fiche', 'date_maj_fiche'];
     }
 
-    /**
-     * Stamp an entry about to be written with the dates it carries on the source wiki.
-     *
-     * The creation date is always the remote one. An imported entry that claims to have been
-     * created the day the import ran is simply wrong, and it shows the moment anything sorts
-     * or filters by creation date, which is most of what a bazar list does.
-     *
-     * The modification date is only copied when the source asks for it
-     * ('keepRemoteUpdateDate'), because it is not only a date: in 'allow_local' mode it is
-     * also what tells an entry a human edited here from one this importer last wrote.
-     */
+    // Stamp an entry about to be written with the dates it carries on the source wiki
     private function withRemoteDates(array $values, ?string $createdAt, ?string $updatedAt): array
     {
         [$createdKey, $updatedKey] = $this->dateKeys();
@@ -561,17 +479,15 @@ class YesWikiToYesWikiImporter extends Importer
         return $this->config['filesMode'] ?? 'download';
     }
 
-    /**
-     * Replace, in an entry about to be written locally, each remote file name by something the
-     * local wiki can serve: either the name of a copy downloaded into the local upload
-     * directory, or an absolute url to the file left on the source wiki (which the file/image
-     * fields of recent YesWiki versions accept as a value).
-     */
-    private function importEntryFiles(array $mappedEntry): array
+    // Replace, in an entry about to be written locally, each remote file name by something the local wiki can serve.
+    private function importEntryFiles(array $mappedEntry, ?array $localEntry): array
     {
         foreach ($this->fileFieldKeys as $key) {
             $value = $mappedEntry[$key] ?? null;
-            // an already absolute url is a file the remote entry itself did not host: keep it
+            if (is_string($value) && strpos($value, 'defaultimage') === 0) {
+                $mappedEntry[$key] = '';
+                continue;
+            }
             if (empty($value) || !is_string($value) || filter_var($value, FILTER_VALIDATE_URL) !== false) {
                 continue;
             }
@@ -586,22 +502,19 @@ class YesWikiToYesWikiImporter extends Importer
                 $this->timeoutInSec(),
                 false,
                 $value,
-                // same session as every other call to this wiki: a source that keeps its
-                // upload directory behind a login serves nothing to an anonymous request
                 empty($this->cookie) ? [] : ['Cookie: ' . $this->cookie]
             );
-            // an entry pointing at a file that isn't there is worse than one without a file:
-            // the field would be emptied on the next local edit anyway
+            $currentValue = $localEntry[$key] ?? '';
+            if ($localFileName === '' && !empty($currentValue)) {
+                echo 'Fichier "' . $value . '" non récupéré : le fichier local "' . $currentValue . '" est conservé.' . "\n";
+                $localFileName = $currentValue;
+            }
             $mappedEntry[$key] = $localFileName;
         }
         return $mappedEntry;
     }
 
-    /**
-     * Url of a file attached to a remote entry. The remote upload directory is "files" unless
-     * that wiki changed its attach_config['upload_path'], which no api exposes: config
-     * 'remoteFilesPath' is there for that (rare) case.
-     */
+    // Url of a file attached to a remote entry
     private function remoteFileUrl(string $fileName): string
     {
         $remotePath = trim($this->config['remoteFilesPath'] ?? 'files', '/');
@@ -619,23 +532,15 @@ class YesWikiToYesWikiImporter extends Importer
         if (!is_array($decoded)) {
             return null;
         }
-        // lists saved before the 2024 {title,nodes} format still store {titre_liste,label} on
-        // disk: ListManager::getOne() normalizes this transparently for local reads, but here
-        // we fetch the remote page's raw body directly, so we need the same conversion.
         return $this->listManager->convertDataStructure($decoded);
     }
 
-    /**
-     * @param array $templateLines parsed template lines (FormManager::parseTemplate())
-     * @return array [propertyName => BazarField]
-     */
     private function fieldsByProperty(array $templateLines): array
     {
         $fields = $this->formManager->prepareData(['template' => $templateLines]);
         $byProperty = [];
         foreach ($fields as $field) {
             $propertyName = $field ? $field->getPropertyName() : null;
-            // skip layout-only fields (tabs, labelhtml, acls, ...): they have no property name
             if (!empty($propertyName)) {
                 $byProperty[$propertyName] = $field;
             }
@@ -653,7 +558,6 @@ class YesWikiToYesWikiImporter extends Importer
             'bn_description' => $remote['bn_description'] ?? '',
             'bn_sem_template' => $remote['bn_sem_template'] ?? '',
             'bn_sem_reverse_template' => $remote['bn_sem_reverse_template'] ?? '',
-            // ActivityPub identity/keys are never copied from a remote instance
             'bn_activitypub_username' => '',
             'bn_activitypub_private_key' => null,
             'bn_activitypub_public_key' => null,
@@ -680,7 +584,6 @@ class YesWikiToYesWikiImporter extends Importer
             return;
         }
 
-        // allow_local: non-destructive union, local-only values are never removed
         $existingList = $this->listManager->isList($localTag) ? $this->listManager->getOne($localTag) : null;
         $byId = [];
         foreach (($existingList['nodes'] ?? []) as $node) {
@@ -697,16 +600,7 @@ class YesWikiToYesWikiImporter extends Importer
             : 'Liste "' . $localTag . '" fusionnée (total local : ' . count($mergedNodes) . ' valeur(s)).' . "\n";
     }
 
-    /**
-     * The fields writing $newValues would actually change in the local entry (empty: nothing
-     * to do). A remote entry that didn't move must not be rewritten: EntryManager::update()
-     * unconditionally saves a new page revision and stamps date_maj_fiche with the current
-     * time, so an unconditional update makes every sync report changes that never happened,
-     * grows the pages table by one revision per entry per run, and (in allow_local) keeps
-     * moving the local "last modified" date the local-edit detection relies on.
-     * Only the keys we are about to write are compared: fields the local form has but the
-     * mapping doesn't cover are none of our business.
-     */
+    // The fields writing $newValues would actually change in the local entry.
     private function changedFields(?array $localEntry, array $newValues): array
     {
         if (empty($localEntry)) {
@@ -715,8 +609,6 @@ class YesWikiToYesWikiImporter extends Importer
         $changed = [];
         $updatedKey = $this->dateKeys()[1];
         foreach ($newValues as $key => $value) {
-            // bazar bookkeeping, not content: 'antispam' is only there to pass validate(),
-            // and the modification date is precisely what an update would (re)write
             if (in_array($key, ['antispam', $updatedKey], true)) {
                 continue;
             }
@@ -727,11 +619,7 @@ class YesWikiToYesWikiImporter extends Importer
         return $changed;
     }
 
-    /**
-     * A field's value as a string that can be compared between what the remote api returned
-     * (json: nulls, numbers, and multi-valued fields possibly as arrays) and what bazar stored
-     * locally (always strings, multi-valued fields comma separated).
-     */
+    // A field value normalized so remote json and local values compare equal.
     private function comparableValue($value): string
     {
         if (is_array($value)) {
@@ -776,12 +664,7 @@ class YesWikiToYesWikiImporter extends Importer
         }
     }
 
-    /**
-     * EntryManager::update() (unlike create(), which always bypasses ACLs) enforces the
-     * write ACL against the current logged-in user, and our CLI/console sync normally runs
-     * with no logged-in user at all: without impersonating a local admin, every update on a
-     * pre-existing entry would be rejected.
-     */
+    // Log in as a local admin so update() passes the write ACL; returns whether it did.
     private function impersonateLocalAdmin(): bool
     {
         if (empty($this->config['localAdminUser'])) {
