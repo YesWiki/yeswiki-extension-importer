@@ -91,9 +91,9 @@ Deux modes de synchronisation :
   `{{adminimporters}}` dès que le formulaire local existe déjà) ; les listes
   sont fusionnées (les valeurs distantes sont ajoutées, les valeurs
   locales sont toujours conservées, rien n'est jamais supprimé) ; les fiches
-  sont créées/mises à jour mais jamais supprimées, et une fiche modifiée
-  localement depuis la dernière synchro n'est plus resynchronisée (pour ne
-  pas écraser une modification locale).
+  sont créées/mises à jour mais jamais supprimées, et les modifications
+  faites ici et sur le wiki distant sont fusionnées champ par champ (voir
+  « Fusion des modifications » ci-dessous).
 
 Si le formulaire local (`formId`) n'existe pas encore, il est créé avec
 exactement les mêmes champs (mêmes identifiants) que le formulaire distant,
@@ -129,6 +129,7 @@ sous-dossier de fichiers par page), utiliser le mode `url`.
             'localAdminUser' => 'admin', // voir note ACL ci-dessous
             'syncMode' => 'source_of_truth', // ou 'allow_local'
             'filesMode' => 'download', // ou 'url'
+            // 'conflictPolicy' => 'local', // ou 'remote', voir « Fusion des modifications » ci-dessous
             // 'keepRemoteUpdateDate' => false, // voir « Dates des fiches » ci-dessous
             // 'fieldsMapping' => ['bf_titre_distant' => 'bf_titre_local', ...], // requis en allow_local si formId existe déjà
             // 'noSSLCheck' => false,
@@ -144,9 +145,62 @@ wiki source. Sans cela une fiche importée prétend avoir été créée le jour 
 l'import, ce qui se voit dès qu'une liste trie ou filtre par date de création.
 
 La date de modification n'est reprise que si `keepRemoteUpdateDate` est
-activé. Elle ne sert pas qu'à l'affichage : en mode `allow_local`, c'est elle
-qui distingue une fiche modifiée ici d'une fiche écrite par l'import. Ne
-l'activer que si les fiches importées ne sont pas modifiées localement.
+activé. Elle sert encore à une chose : repérer, en mode `allow_local`, les
+fiches importées avant la fusion champ par champ et modifiées ici depuis (voir
+ci-dessous). Ne l'activer que si ces fiches ne sont pas modifiées localement.
+
+#### Fusion des modifications
+
+En mode `allow_local`, chaque fiche importée garde, pour chaque champ, une
+empreinte de la valeur reçue du wiki distant et de la valeur enregistrée ici
+lors du dernier import (triple `sync_base_<source>`). À la synchro suivante,
+chaque champ est comparé à ces empreintes :
+
+- modifié seulement sur le wiki distant : la valeur distante est reprise ;
+- modifié seulement ici : la valeur locale est gardée ;
+- modifié des deux côtés avec la même valeur : rien à faire ;
+- modifié des deux côtés avec des valeurs différentes : c'est un conflit.
+  `conflictPolicy` décide : `local` (par défaut) garde la valeur de ce wiki,
+  `remote` prend celle du wiki distant. Le journal de synchro note le conflit
+  avec les deux valeurs, une seule fois : tant que le wiki distant ne modifie
+  pas à nouveau ce champ, il n'est plus signalé.
+
+Seules les empreintes sont stockées, pas le contenu : le journal est donc le
+seul endroit où la valeur écartée d'un conflit reste visible.
+
+Une fiche importée avant la fusion n'a pas d'empreinte. Si elle a été modifiée
+ici depuis la dernière synchro, elle n'est pas touchée une fois de plus, et
+ses différences avec le wiki distant comptent ensuite comme des modifications
+locales. Sinon, elle reprend la version distante. Dans les deux cas, ses
+empreintes sont enregistrées et les synchros suivantes fusionnent.
+
+#### Imports croisés
+
+Des wikis peuvent s'importer les uns les autres, y compris en boucle (A ↔ B,
+ou A → B → C → A), sans que les fiches reviennent à leur point de départ.
+
+Chaque fiche importée retient l'url à laquelle elle a été écrite la première
+fois : l'url source pour un import direct, l'url d'origine que le wiki distant
+a transmise (`origin_url` dans l'API) pour un import d'import. L'importer
+demande au wiki distant de ne pas renvoyer les fiches dont cette origine est
+le wiki local (paramètre `excludeSource` de l'API, qui reçoit la `base_url`
+locale). Les fiches venues d'autres wikis restent importées.
+
+La même origine sert à dédoublonner. Une fiche peut arriver ici par deux
+chemins : ce wiki importe A et B, et B a lui-même importé A, ou bien deux
+sources ont copié la même fiche. Elle n'est alors créée qu'une fois. La
+première source qui l'a importée en reste propriétaire : c'est la seule qui la
+met à jour, et en mode `source_of_truth`, la seule qui peut la supprimer. Les
+autres sources la sautent et le notent dans le journal. Si la source
+propriétaire la supprime, la suivante la recrée et en devient propriétaire.
+
+Il faut un YesWiki à jour sur tous les wikis de la chaîne : un wiki qui ne
+connaît pas `excludeSource` ignore le paramètre et renvoie tout, et un wiki
+qui n'expose pas `origin_url` coupe la transmission de l'origine.
+
+En mode `source_of_truth`, importer dans un formulaire qui a ses propres
+fiches les supprime à la première synchro, puisqu'elles sont absentes de la
+source. Pour un import croisé dans un même formulaire, utiliser `allow_local`.
 
 L'url est découpée à la lecture de la configuration en `url` (url de base du
 wiki distant), `remoteFormId` et `entriesQuery` : une configuration écrite à

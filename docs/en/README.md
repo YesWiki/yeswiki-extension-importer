@@ -76,9 +76,9 @@ Two synchronisation modes:
 - **`allow_local`**: loose synchronisation. The local form may differ, and a field
   mapping is then asked for in `{{adminimporters}}` as soon as the local form already
   exists. Lists are merged: remote values are added, local values are always kept,
-  nothing is ever deleted. Entries are created and updated but never deleted, and an
-  entry changed locally since the last sync is no longer resynchronised, so a local edit
-  is not overwritten.
+  nothing is ever deleted. Entries are created and updated but never deleted, and edits
+  made here and on the remote wiki are merged field by field (see "Merging edits"
+  below).
 
 When the local form (`formId`) does not exist yet, it is created with exactly the same
 fields, and the same field ids, as the remote form, in either mode.
@@ -109,6 +109,7 @@ wiki has `no_safe_mode` enabled, giving one files subfolder per page, use `url` 
             'localAdminUser' => 'admin', // see the ACL note below
             'syncMode' => 'source_of_truth', // or 'allow_local'
             'filesMode' => 'download', // or 'url'
+            // 'conflictPolicy' => 'local', // or 'remote', see "Merging edits" below
             // 'keepRemoteUpdateDate' => false, // see "Entry dates" below
             // 'fieldsMapping' => ['bf_titre_distant' => 'bf_titre_local', ...], // required in allow_local when formId already exists
             // 'noSSLCheck' => false,
@@ -123,10 +124,58 @@ An imported entry's creation date is always the one it has on the source wiki. W
 that, an imported entry claims to have been created on the day of the import, which
 shows as soon as a list sorts or filters by creation date.
 
-The modification date is only carried over when `keepRemoteUpdateDate` is on. It is not
-only for display: in `allow_local` mode it is what tells an entry edited here from an
-entry written by the import. Only turn it on when imported entries are not edited
-locally.
+The modification date is only carried over when `keepRemoteUpdateDate` is on. It still
+has one job: in `allow_local` mode, spotting entries imported before field-by-field
+merging and edited here since (see below). Only turn it on when those entries are not
+edited locally.
+
+#### Merging edits
+
+In `allow_local` mode, each imported entry keeps, for each field, a fingerprint of the
+value received from the remote wiki and of the value stored here at the last import (the
+`sync_base_<source>` triple). On the next sync, each field is compared with them:
+
+- changed only on the remote wiki: the remote value is taken;
+- changed only here: the local value is kept;
+- changed on both sides to the same value: nothing to do;
+- changed on both sides to different values: a conflict. `conflictPolicy` decides:
+  `local` (the default) keeps this wiki's value, `remote` takes the remote one. The sync
+  log records the conflict with both values, once: as long as the remote wiki does not
+  change that field again, it is not reported again.
+
+Only fingerprints are stored, not content, so the log is the only place the value a
+conflict set aside can still be seen.
+
+An entry imported before merging existed has no fingerprint. If it was edited here since
+the last sync, it is left alone one more time, and its differences with the remote wiki
+then count as local edits. Otherwise it takes the remote version. Either way its
+fingerprints are recorded and later syncs merge.
+
+#### Two-way imports
+
+Wikis can import from each other, loops included (A ↔ B, or A → B → C → A), without
+entries coming back to where they started.
+
+Each imported entry keeps the URL it was first written at: its source URL for a direct
+import, or the origin URL the remote wiki passed on (`origin_url` in the API) for an
+import of an import. The importer asks the remote wiki not to return the entries whose
+origin is the local wiki (the API's `excludeSource` parameter, given the local
+`base_url`). Entries from other wikis are still imported.
+
+The same origin is used to remove duplicates. An entry can reach this wiki by two
+paths: this wiki imports A and B, and B itself imported A, or two sources copied the same
+entry. It is then only created once. The first source that imported it owns it: only
+that source updates it, and in `source_of_truth` mode only that source can delete it.
+Other sources skip it and say so in the log. If the owning source deletes it, the next
+one creates it again and becomes its owner.
+
+Every wiki in the chain needs an up-to-date YesWiki: one that does not know
+`excludeSource` ignores it and returns everything, and one that does not expose
+`origin_url` breaks the chain of origins.
+
+In `source_of_truth` mode, importing into a form that has entries of its own deletes
+them on the first sync, since the source doesn't have them. For a two-way import into the
+same form, use `allow_local`.
 
 The URL is split when the configuration is read, into `url` (the remote wiki's base
 URL), `remoteFormId` and `entriesQuery`. A configuration written by hand with those
